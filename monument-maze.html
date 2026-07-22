@@ -1,0 +1,4167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>MONUMENT MAZE</title>
+<style>
+  html, body { margin:0; height:100%; overflow:hidden; touch-action:none;
+    -webkit-user-select:none; user-select:none;
+    background: linear-gradient(175deg, #f7e8d8 0%, #ecd5cd 45%, #d5c3d9 100%);
+    font-family: Georgia, 'Times New Roman', serif; }
+  canvas { display:block; }
+
+  #hud {
+    position:fixed; top:16px; left:50%; transform:translateX(-50%);
+    display:flex; gap:10px; align-items:center; pointer-events:none;
+    flex-wrap:wrap; justify-content:center;
+  }
+  .chip {
+    background:rgba(255,252,246,0.75); border:1px solid rgba(90,70,90,0.18);
+    border-radius:20px; padding:6px 14px; color:#5c4a5e; font-size:13px;
+    letter-spacing:2px; display:flex; align-items:center; gap:8px;
+    box-shadow:0 2px 10px rgba(90,70,90,0.08);
+  }
+  #faceDot { width:9px; height:9px; border-radius:50%; background:#eec170; }
+  #timeChip.low { color:#b23a3a; border-color:rgba(178,58,58,0.4); }
+  #menuBtn, #labBtn { pointer-events:auto; cursor:pointer; }
+  #menuBtn:hover, #labBtn:hover { background:rgba(255,252,246,0.95); }
+
+  #lab {
+    position:fixed; top:70px; right:16px; display:none; flex-direction:column;
+    background:rgba(255,252,246,0.94); border:1px solid rgba(90,70,90,0.22);
+    border-radius:12px; padding:14px 16px; width:252px;
+    max-height:calc(100vh - 100px);
+    box-shadow:0 6px 24px rgba(90,70,90,0.16);
+  }
+  #featList {
+    overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+    touch-action:pan-y;
+    min-height:0; flex:1; margin-right:-6px; padding-right:6px;
+  }
+  #featList::-webkit-scrollbar { width:5px; }
+  #featList::-webkit-scrollbar-thumb {
+    background:rgba(90,70,90,0.25); border-radius:3px;
+  }
+  #featList::-webkit-scrollbar-track { background:transparent; }
+  .labTitle { color:#5c4a5e; letter-spacing:4px; font-size:13px; margin-bottom:6px; }
+  .labCat {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:9px 4px 6px 4px; margin-top:4px; cursor:pointer; user-select:none;
+    border-bottom:1px solid rgba(90,70,90,0.12);
+  }
+  .labCat:hover .catName { color:#5c4a5e; }
+  .catName { color:rgba(92,74,94,0.85); font-size:11px; letter-spacing:3px; font-weight:600; }
+  .catChev { color:rgba(92,74,94,0.5); font-size:11px; }
+  .catBody { overflow:hidden; }
+  .catBody.collapsed { display:none; }
+  .labLevel {
+    display:flex; justify-content:space-between; align-items:center;
+    padding-bottom:10px; border-bottom:1px solid rgba(90,70,90,0.15);
+  }
+  .labLevel > span { color:#5c4a5e; font-size:12px; letter-spacing:3px; }
+  .lvlBtns { display:flex; align-items:center; gap:10px; }
+  .lvlBtn {
+    width:24px; height:24px; border-radius:6px; background:rgba(90,70,90,0.12);
+    color:#5c4a5e; font-size:16px; display:flex; align-items:center;
+    justify-content:center; cursor:pointer; user-select:none;
+  }
+  .lvlBtn:hover { background:rgba(90,70,90,0.22); }
+  #lvlNum { color:#5c4a5e; font-size:14px; min-width:20px; text-align:center; }
+  .featRow {
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:9px 0; border-top:1px solid rgba(90,70,90,0.1); cursor:pointer;
+  }
+  .fname { color:#5c4a5e; font-size:13px; letter-spacing:2px; }
+  .fdesc { color:rgba(92,74,94,0.55); font-size:11px; font-style:italic; }
+  .tog {
+    width:34px; height:18px; border-radius:9px; background:rgba(90,70,90,0.18);
+    position:relative; flex:none; transition:background .15s;
+  }
+  .tog::after {
+    content:''; position:absolute; top:2px; left:2px; width:14px; height:14px;
+    border-radius:50%; background:#fff; transition:left .15s;
+    box-shadow:0 1px 3px rgba(90,70,90,0.3);
+  }
+  .tog.on { background:#84b6a6; }
+  .tog.on::after { left:18px; }
+  .slLabel {
+    color:rgba(92,74,94,0.55); font-size:10px; letter-spacing:2px;
+    margin-top:4px;
+  }
+  .featSlider {
+    display:flex; align-items:center; gap:10px; padding:2px 0 10px 0;
+  }
+  .featSlider input[type=range] { flex:1; accent-color:#84b6a6; }
+  .featSlider span { color:rgba(92,74,94,0.7); font-size:11px; min-width:30px; text-align:right; white-space:nowrap; }
+  .labNote { color:rgba(92,74,94,0.45); font-size:10px; font-style:italic; margin-top:8px; }
+  .labClose { margin-top:8px; text-align:center; color:#5c4a5e; font-size:11px; letter-spacing:3px; cursor:pointer; }
+
+  #hint {
+    position:fixed; bottom:16px; left:50%; transform:translateX(-50%);
+    color:rgba(92,74,94,0.5); font-size:11px; letter-spacing:2px;
+    pointer-events:none; white-space:nowrap; font-style:italic;
+  }
+
+  #overlay {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    pointer-events:none; opacity:0; transition:opacity 0.35s;
+  }
+  #overlay span {
+    color:#5c4a5e; font-size:34px; letter-spacing:8px;
+    background:rgba(255,252,246,0.85); padding:18px 38px; border-radius:8px;
+    border:1px solid rgba(90,70,90,0.2); box-shadow:0 6px 30px rgba(90,70,90,0.15);
+  }
+
+  #menu {
+    position:fixed; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:8px;
+    background:rgba(247,232,216,0.55); backdrop-filter:blur(3px);
+  }
+  #menu h1 {
+    margin:0; color:#5c4a5e; font-size:42px; letter-spacing:12px; font-weight:normal;
+    text-shadow:0 2px 12px rgba(255,252,246,0.8);
+  }
+  #menu .sub {
+    margin:0 0 26px; color:rgba(92,74,94,0.6); font-size:13px;
+    letter-spacing:4px; font-style:italic;
+  }
+  .modeBtn {
+    width:min(320px, 80vw); background:rgba(255,252,246,0.85);
+    border:1px solid rgba(90,70,90,0.22); border-radius:10px;
+    padding:14px 22px; margin:6px 0; cursor:pointer; text-align:left;
+    box-shadow:0 3px 14px rgba(90,70,90,0.1); transition:transform .12s, box-shadow .12s;
+  }
+  .modeBtn:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(90,70,90,0.16); }
+  .modeBtn .mname { color:#5c4a5e; font-size:16px; letter-spacing:4px; }
+  .modeBtn .mdesc { color:rgba(92,74,94,0.6); font-size:12px; font-style:italic; margin-top:4px; }
+
+  /* ---------- on-screen touch controls ---------- */
+  #touchControls {
+    position:fixed; bottom:22px; left:0; right:0; display:none;
+    justify-content:space-between; align-items:flex-end;
+    padding:0 24px; pointer-events:none; z-index:20;
+  }
+  #dpad {
+    display:grid; grid-template-columns:repeat(3, 54px); grid-template-rows:repeat(3, 54px);
+    gap:6px; pointer-events:none;
+  }
+  #dUp    { grid-column:2; grid-row:1; }
+  #dLeft  { grid-column:1; grid-row:2; }
+  .dcenter{ grid-column:2; grid-row:2; background:none; border:none; box-shadow:none; }
+  #dRight { grid-column:3; grid-row:2; }
+  #dDown  { grid-column:2; grid-row:3; }
+  .dbtn, .tbtn {
+    pointer-events:auto; -webkit-user-select:none; user-select:none; touch-action:none;
+    background:rgba(255,252,246,0.82); border:1px solid rgba(90,70,90,0.22);
+    border-radius:14px; color:#5c4a5e; font-size:20px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 2px 10px rgba(90,70,90,0.12); transition:transform .06s, background .06s;
+  }
+  .dbtn:active, .tbtn:active { transform:scale(0.9); background:rgba(224,160,58,0.35); }
+  #turnPad { display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+  .tbtn { width:54px; height:54px; font-size:26px; }
+
+  /* show the pad on touch / coarse-pointer devices */
+  @media (pointer:coarse) {
+    #touchControls { display:flex; }
+    #hint { display:none; }        /* the keyboard hint is irrelevant on touch */
+  }
+  body.touch #touchControls { display:flex; }
+  body.touch #hint { display:none; }
+
+  /* ---------- narrow-screen (phone) layout ---------- */
+  @media (max-width:560px) {
+    #hud {
+      top:10px; gap:6px; padding:0 8px; width:100%; box-sizing:border-box;
+    }
+    .chip { padding:5px 10px; font-size:11px; letter-spacing:1px; }
+    /* keep only the essential chips; fold the rest behind smaller sizing */
+    #lab {
+      top:auto; bottom:0; right:0; left:0; width:auto;
+      max-height:70vh; border-radius:16px 16px 0 0;
+      padding:14px 18px calc(14px + env(safe-area-inset-bottom));
+    }
+    #menu h1 { font-size:32px; letter-spacing:8px; }
+    #overlay span { font-size:24px; letter-spacing:5px; padding:14px 26px; }
+    /* lift the pad above the phone's home indicator */
+    #touchControls { bottom:calc(18px + env(safe-area-inset-bottom)); padding:0 16px; }
+  }
+  @media (max-width:380px) {
+    #dpad { grid-template-columns:repeat(3, 48px); grid-template-rows:repeat(3, 48px); }
+    .tbtn { width:48px; height:48px; }
+  }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="chip" id="levelChip">LEVEL 1</div>
+  <div class="chip"><div id="faceDot"></div><span id="faceName">TOP</span></div>
+  <div class="chip" id="gems">&#9670; 0 / 5</div>
+  <div class="chip" id="timeChip">1:20</div>
+  <div class="chip" id="labBtn">LAB</div>
+  <div class="chip" id="menuBtn">MENU</div>
+</div>
+<div id="hint">arrows / WASD or swipe &nbsp;&middot;&nbsp; hold Q / E to turn the cube &nbsp;&middot;&nbsp; collect every &#9670;</div>
+<div id="touchControls">
+  <div id="dpad">
+    <div class="dbtn" id="dUp" data-dir="up">&#9650;</div>
+    <div class="dbtn" id="dLeft" data-dir="left">&#9664;</div>
+    <div class="dbtn dcenter"></div>
+    <div class="dbtn" id="dRight" data-dir="right">&#9654;</div>
+    <div class="dbtn" id="dDown" data-dir="down">&#9660;</div>
+  </div>
+  <div id="turnPad">
+    <div class="tbtn" id="tQ" data-turn="q">&#8634;</div>
+    <div class="tbtn" id="tE" data-turn="e">&#8635;</div>
+  </div>
+</div>
+<div id="overlay"><span id="overlayText"></span></div>
+<div id="lab">
+  <div class="labTitle">LABORATORY</div>
+  <div class="labLevel">
+    <span>LEVEL</span>
+    <div class="lvlBtns">
+      <div class="lvlBtn" id="lvlDown">&minus;</div>
+      <span id="lvlNum">1</span>
+      <div class="lvlBtn" id="lvlUp">+</div>
+    </div>
+  </div>
+  <div id="featList"></div>
+  <div class="labNote">toggling rebuilds the level</div>
+  <div class="labClose" id="labClose">CLOSE</div>
+</div>
+<div id="menu">
+  <h1>MONUMENT MAZE</h1>
+  <p class="sub">a puzzle on six planes</p>
+  <div id="modeList"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+'use strict';
+
+// ---------- mode registry ----------
+// A mode is data, not a copy of the code. New experiments = new entries here
+// (plus, if needed, a feature system gated behind a flag). Every mode shares
+// the one engine: movement, generation, rendering.
+// OBJECTIVES sit on top of ONE shared open layout. The layout generator is the
+// same for all three (the breathable Classic board — sparse blocks, monuments,
+// negative space); the objective only decides what's placed on top and what
+// "winning" means. This keeps every lab dynamic available to every objective.
+const MODES = {
+  collect: {
+    name: 'COLLECT',
+    desc: 'Gather every gem across the six planes.',
+    timer: true,
+    density: 1.0,
+    objective: 'collect',
+  },
+  reach: {
+    name: 'REACH',
+    desc: 'Find the single goal and get there.',
+    timer: false,
+    density: 1.0,
+    objective: 'reach',
+  },
+  puzzle: {
+    name: 'PUZZLE',
+    desc: 'Solve the maze — no clock, no rush.',
+    timer: false,
+    density: 1.0,
+    objective: 'puzzle',
+  },
+};
+let modeKey = 'collect';
+const MODE = () => MODES[modeKey];
+// goal-based objectives (reach a single finish) vs gem collection
+const isGoalObjective = () => MODE().objective === 'reach' || MODE().objective === 'puzzle';
+
+// ---------- feature lab ----------
+// Gameplay elements as switches: flip one on to test it, off to shelve it —
+// no code surgery either way. Three hook shapes cover everything:
+//   gen()   runs during level build (adds content/data)
+//   onGem() runs on collect (events)
+//   plain values the engine reads (see speed())
+const FEATURES = {
+  towers: {
+    name:'TOWERS', desc:'the stacked cube obstacles',
+    on:true,
+    gen(){ generateObstacles(Math.min(Math.round((20 + level*8) * MODE().density), 80)); },
+  },
+  rails: {
+    name:'RAILS', desc:'thin walls along the grid seams',
+    on:true,
+    gen(){ generateRails(Math.min(8 + level*3, 26)); },
+  },
+  holes: {
+    name:'HOLES', desc:'open pits — fall in, start over',
+    on:false,
+    gen(){ generateHoles(Math.min(3 + level*2, 14)); },
+  },
+  bridges: {
+    name:'TUNNELS', desc:'stone tunnels to pass through — sides are walled',
+    on:true,
+    gen(){ generateBridges(Math.min(2 + level, 8)); },
+  },
+  portals: {
+    name:'PORTALS', desc:'linked doorways — matching colours connect',
+    on:true,
+    gen(){ generatePortals(Math.min(2 + (level >> 1), 4)); },
+  },
+  timer: {
+    name:'TIME LIMIT', desc:'the clock itself — off for pure exploration',
+    on:false,
+  },
+  bonusTime: {
+    name:'TIME BONUS', desc:'+3s for every gem collected',
+    on:false,
+    onGem(){ if (timerActive()) timeLeft += 3; },
+  },
+  sprint: {
+    name:'SPRINT', desc:'snappier movement animations',
+    on:false,
+  },
+  sound: {
+    name:'SOUND', desc:'wood, bells and breath — all synthesised',
+    on:true,
+    slider: { min:0, max:100, step:5, value:60, unit:'%' },
+  },
+  drone: {
+    name:'DRONE', desc:'a slow pad in C — the key the gems ring in',
+    on:false,
+    slider: { min:0, max:100, step:5, value:45, unit:'%' },
+  },
+  masonry: {
+    name:'MASONRY', desc:'blocks built from smaller stones — hand-laid, not cast',
+    on:true,
+    slider: { min:0, max:100, step:1, value:50, unit:'%' },
+    sliders: [
+      { key:'rough', label:'ROUGHNESS', min:0, max:100, step:5, value:20, unit:'%',
+        hint:'uneven heights and missing stones — quarried, not tidy' },
+      { key:'heightVar', label:'HEIGHT VARIATION', min:0, max:100, step:5, value:75, unit:'%',
+        hint:'tumbledown skyline — some blocks low, some stacked tall (visual only)' },
+    ],
+  },
+  blockGap: {
+    name:'BLOCK GAP', desc:'spacing between neighbouring blocks — flush or inset',
+    on:true,
+    slider: { min:0, max:16, step:1, value:0, unit:'%' },
+  },
+  oneways: {
+    name:'ONE-WAY TILES', desc:'arrows you can only cross one way — commitment and routing',
+    on:true,
+    gen(){ generateOneWays(Math.min(2 + (level >> 1), 8)); },
+  },
+  keystone: {
+    name:'KEYSTONE', desc:'collect the gems, then journey to the awakened monument to finish',
+    on:false,
+  },
+  monuments: {
+    name:'MONUMENTS', desc:'occasional little landmarks — ziggurats, obelisks, arches',
+    on:true,
+    slider: { min:0, max:100, step:5, value:60, unit:'%' },
+  },
+  facePalette: {
+    name:'FACE PALETTE', desc:'the six cube-face colours — from pastel to ancient stone',
+    on:true,
+    slider: { min:0, max:9, step:1, value:9, unit:'' },
+    sliders: [
+      { key:'texture', label:'WEATHERING', min:0, max:100, step:5, value:100, unit:'%',
+        hint:'strength of the aged-stone mottling, streaks and cracks' },
+      { key:'moss', label:'VEGETATION', min:0, max:100, step:5, value:75, unit:'%',
+        hint:'moss and lichen creeping over the stone' },
+    ],
+  },
+  palette: {
+    name:'STONE PALETTE', desc:'the base stone colours — tuned to sit against the pastel faces',
+    on:true,
+    slider: { min:0, max:6, step:1, value:1, unit:'' },
+    sliders: [
+      { key:'weather', label:'WEATHERING', min:0, max:100, step:5, value:30, unit:'%',
+        hint:'mottling and stains aged into the stone surface' },
+      { key:'moss', label:'VEGETATION', min:0, max:100, step:5, value:25, unit:'%',
+        hint:'moss creeping up the lower stones' },
+    ],
+  },
+  tint: {
+    name:'STONE VARIATION', desc:'each block a slightly different shade — weathered, never cloned',
+    on:true,
+    slider: { min:0, max:100, step:1, value:15, unit:'%' },
+  },
+  bevels: {
+    name:'BEVELS', desc:'softened edges that catch the light — crafted, not default',
+    on:false,
+    slider: { min:0, max:14, step:1, value:6, unit:'%' },
+  },
+  shadows: {
+    name:'SHADOWS', desc:'blocks cast onto the faces — grounds them in the space',
+    on:true,
+    slider: { min:0, max:100, step:5, value:75, unit:'%' },
+  },
+  seeThrough: {
+    name:'SEE THROUGH', desc:'obstacles hiding the player fade out',
+    on:false,
+    slider: { min:5, max:70, step:5, value:22, unit:'%' },
+  },
+  solution: {
+    name:'SOLUTION', desc:'breadcrumb trail along the route — a testing tool',
+    on:false,
+  },
+  freeCam: {
+    name:'FREE CAMERA', desc:'orbit freely; the cube stays put and you move relative to the view',
+    on:false,
+  },
+  skewView: {
+    name:'SKEWED VIEW', desc:'offset the locked angle so forward is obvious on the top plane',
+    on:true,
+    slider: { min:0, max:40, step:1, value:20, unit:'\u00b0' },
+    sliders: [
+      { key:'lift', label:'SIDE DROP', min:0, max:30, step:1, value:0, unit:'\u00b0',
+        hint:'lower the view on the side planes' },
+      { key:'dip', label:'TOP RISE', min:0, max:30, step:1, value:0, unit:'\u00b0',
+        hint:'raise the view at the top plane\u2019s far edge' },
+    ],
+  },
+};
+const featureOn = k => FEATURES[k].on;
+const speed = () => featureOn('sprint') ? 0.55 : 1;
+const timerActive = () => MODE().timer && featureOn('timer');
+
+// ---------- layout ----------
+const N = 6;
+const H = 3;
+const CELL = (2*H) / N;
+const SLIDE_MS = 150;
+const FLIP_MS  = 340;
+const SWIVEL_MS = 480;
+
+const FACES = [
+  { n:new THREE.Vector3( 1,0,0), name:'EAST',   color:'#e08e79' },
+  { n:new THREE.Vector3(-1,0,0), name:'WEST',   color:'#84b6a6' },
+  { n:new THREE.Vector3(0, 1,0), name:'TOP',    color:'#eec170' },
+  { n:new THREE.Vector3(0,-1,0), name:'BOTTOM', color:'#9a8fb8' },
+  { n:new THREE.Vector3(0,0, 1), name:'SOUTH',  color:'#d98ba0' },
+  { n:new THREE.Vector3(0,0,-1), name:'NORTH',  color:'#7f9bc4' },
+];
+const AXES = [
+  new THREE.Vector3(1,0,0), new THREE.Vector3(-1,0,0),
+  new THREE.Vector3(0,1,0), new THREE.Vector3(0,-1,0),
+  new THREE.Vector3(0,0,1), new THREE.Vector3(0,0,-1),
+];
+
+// ---------- renderer / scene / fixed iso camera ----------
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+let camera;
+const ISO_EL = Math.atan(1/Math.SQRT2);      // the classic isometric elevation
+const _invCamQ = new THREE.Quaternion();     // world -> screen
+const CAM_DIR = new THREE.Vector3(1,1,1).normalize();   // camera view direction
+// free-camera orbit: azimuth around the cube, elevation above it
+let camAz = Math.PI/4, camEl = Math.atan(1/Math.SQRT2);   // matches the locked iso view
+// SKEWED VIEW mirrors left/right so neither side plane is permanently the
+// squashed one. It flips only when the player changes plane — never mid-walk,
+// which would swing the view and change what the keys mean underfoot.
+let skewSign = 1, skewCur = 0, elevCur = Math.atan(1/Math.SQRT2);
+const CAM_R = Math.sqrt(12*12*3);   // the classic (12,12,12) isometric distance
+function applyCamera(){
+  if (featureOn('freeCam')){
+    camera.position.set(
+      CAM_R * Math.cos(camEl) * Math.cos(camAz),
+      CAM_R * Math.sin(camEl),
+      CAM_R * Math.cos(camEl) * Math.sin(camAz));
+    camera.up.set(0, 1, 0);
+  } else {    // locked view. SKEWED VIEW offsets the azimuth off the symmetric isometric:
+    // at 0° the top plane's four directions project to identical diagonals, so
+    // nothing on screen says which way is forward. Offsetting breaks that tie
+    // geometrically — one direction reads clearly up-screen. The offset mirrors
+    // (skewSign) so neither side plane stays squashed forever.
+    const az = Math.PI/4 + skewCur;
+    const el = elevCur;
+    camera.position.set(
+      CAM_R * Math.cos(el) * Math.cos(az),
+      CAM_R * Math.sin(el),
+      CAM_R * Math.cos(el) * Math.sin(az));
+    camera.up.set(0, 1, 0);
+  }
+  camera.lookAt(0, 0, 0);
+  // a NaN anywhere in the camera blanks the whole render — never let one through
+  if (!Number.isFinite(camera.position.x + camera.position.y + camera.position.z)){
+    console.warn('camera NaN guarded; falling back to isometric');
+    skewCur = 0; elevCur = ISO_EL;
+    camera.position.set(12, 12, 12);
+    camera.up.set(0, 1, 0);
+    camera.lookAt(0, 0, 0);
+  }
+  _invCamQ.copy(camera.quaternion).invert();
+  CAM_DIR.copy(camera.position).normalize();
+}
+function setupCamera(){
+  const aspect = innerWidth / innerHeight;
+  const S = H * 2.1;
+  camera = new THREE.OrthographicCamera(-S*aspect, S*aspect, S, -S, 0.1, 100);
+  applyCamera();
+}
+setupCamera();
+
+// lighting: a soft sky fill plus a directional sun. The balance between them
+// IS the shadow strength — more fill washes shadows out, less deepens them.
+const hemi = new THREE.HemisphereLight(0xfff6e8, 0xb8a6c4, 1.05);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 0.4);
+sun.position.set(8, 14, 6);
+// shadow frustum: tight around the cube (plus stacks) so the map stays sharp
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+const SR = H * 2.4;
+sun.shadow.camera.left = -SR; sun.shadow.camera.right = SR;
+sun.shadow.camera.top = SR;   sun.shadow.camera.bottom = -SR;
+sun.shadow.camera.near = 1;   sun.shadow.camera.far = 40;
+sun.shadow.bias = -0.0015;
+sun.shadow.normalBias = 0.02;
+scene.add(sun);
+
+// Shadow strength trades the sun against the sky fill: a stronger sun casts
+// deeper shadows, and the fill drops to let them read. At zero it's the
+// original flat lighting.
+function applyShadows(){
+  const on = featureOn('shadows');
+  const s = on ? FEATURES.shadows.slider.value / 100 : 0;
+  renderer.shadowMap.enabled = on && s > 0;
+  sun.castShadow = on && s > 0;
+  sun.intensity = 0.4 + s * 0.75;
+  hemi.intensity = 1.05 - s * 0.42;
+  scene.traverse(o => { if (o.isMesh && o.material) o.material.needsUpdate = true; });
+}
+
+// Six-colour face schemes — the whole world's palette. Order matches FACES:
+// EAST, WEST, TOP, BOTTOM, SOUTH, NORTH. Each is a cohesive set where no two
+// adjacent faces clash and the top (the main play surface) stays legible.
+const FACE_PALETTES = [
+  { name:'Sorbet',    cols:['#e08e79','#84b6a6','#eec170','#9a8fb8','#d98ba0','#7f9bc4'] }, // original
+  { name:'Dusk',      cols:['#d98a8a','#7d9fb0','#e6b98a','#8f82a8','#c98aa8','#6f8bb0'] }, // muted, cooler
+  { name:'Meadow',    cols:['#a8c88a','#7bb0a0','#e6d488','#b0a8c0','#e0a890','#88a8c0'] }, // fresh greens/warm
+  { name:'Candy',     cols:['#f2a0b0','#8fd0c0','#ffd98a','#c0a8e0','#f2a0c8','#90c0e8'] }, // brighter, playful
+  { name:'Terracotta',cols:['#d88a6a','#9aa87a','#e0b070','#a89078','#cc8888','#8898a0'] }, // earthy, warm
+  { name:'Nocturne',  cols:['#b0708a','#5f8a90','#c0a070','#70688f','#a0708f','#5a7090'] }, // deep, dim, moody
+  // ---- ruin sets: desaturated aged stone, textured surfaces ----
+  { name:'Weathered Stone', ruin:true,
+    cols:['#b0a290','#9aa596','#c4b48f','#9c95a0','#b39a94','#93a0a8'] }, // earthy, six muted tones
+  { name:'Mossy Ruins', ruin:true,
+    cols:['#9ba883','#8fa891','#b3ac82','#93998a','#a89a86','#8a9c95'] }, // green/ochre lichen
+  { name:'Bleached Bone', ruin:true,
+    cols:['#d8cfbe','#cdd0c6','#dcd2bb','#cbc6c8','#d4c7bd','#c4cbcd'] }, // pale sun-worn
+  { name:'Sunken Temple', ruin:true,
+    cols:['#8a9488','#7f9498','#9a9880','#84838f','#918980','#7c8a92'] }, // dim, damp, shadowed
+];
+function activeFacePalette(){
+  const idx = featureOn('facePalette')
+    ? Math.max(0, Math.min(FACE_PALETTES.length - 1, FEATURES.facePalette.slider.value)) : 0;
+  return FACE_PALETTES[idx];
+}
+function faceColor(fi){ return activeFacePalette().cols[fi]; }
+
+// ---------- the cube ----------
+const world = new THREE.Group();
+scene.add(world);
+
+// Per-face canvases: redrawn each level so hole openings can be cut straight
+// out of the surface (alphaTest discards the erased pixels, revealing the
+// shaft geometry sunk inside the cube).
+const faceCanvases = [], faceTextures = [];
+function drawFaceBase(fi){
+  const c = faceCanvases[fi];
+  const g = c.getContext('2d');
+  g.clearRect(0,0,512,512);
+  g.fillStyle = faceColor(fi); g.fillRect(0,0,512,512);
+  if (activeFacePalette().ruin){
+    const wx = FEATURES.facePalette.sliders[0].value / 100;   // WEATHERING
+    const mo = FEATURES.facePalette.sliders[1].value / 100;   // VEGETATION
+    if (wx > 0) drawStoneTexture(g, fi, wx);
+    if (mo > 0) drawVegetation(g, fi, mo);
+  }
+  const s = 512 / N;
+  g.strokeStyle = 'rgba(60,45,70,0.16)'; g.lineWidth = 2;
+  for (let i=1;i<N;i++){
+    g.beginPath(); g.moveTo(i*s,0); g.lineTo(i*s,512); g.stroke();
+    g.beginPath(); g.moveTo(0,i*s); g.lineTo(512,i*s); g.stroke();
+  }
+  g.strokeStyle = 'rgba(60,45,70,0.35)'; g.lineWidth = 8;
+  g.strokeRect(0,0,512,512);
+}
+
+// procedural aged-stone surface, scaled by amount (0..1)
+function drawStoneTexture(g, fi, amt){
+  const rnd = seededRand((fi*2654435761 + 12345) >>> 0);
+  g.save();
+  for (let i = 0; i < 90; i++){
+    const x = rnd()*512, y = rnd()*512, r = 20 + rnd()*90;
+    const dark = rnd() < 0.5;
+    const a = (0.03 + rnd()*0.06) * amt;
+    const grad = g.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, (dark ? 'rgba(50,42,38,' : 'rgba(255,252,245,') + a + ')');
+    grad.addColorStop(1, (dark ? 'rgba(50,42,38,0)' : 'rgba(255,252,245,0)'));
+    g.fillStyle = grad;
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI*2); g.fill();
+  }
+  for (let i = 0; i < 900; i++){
+    g.fillStyle = rnd() < 0.5 ? 'rgba(40,34,30,' + (0.05*amt) + ')'
+                              : 'rgba(255,250,240,' + (0.05*amt) + ')';
+    g.fillRect(rnd()*512, rnd()*512, 2, 2);
+  }
+  g.strokeStyle = 'rgba(50,44,38,' + (0.05*amt) + ')';
+  for (let i = 0; i < 6; i++){
+    const x = rnd()*512;
+    g.lineWidth = 6 + rnd()*22;
+    g.beginPath(); g.moveTo(x, 0);
+    g.bezierCurveTo(x + (rnd()-0.5)*40, 180, x + (rnd()-0.5)*50, 340, x + (rnd()-0.5)*30, 512);
+    g.stroke();
+  }
+  g.strokeStyle = 'rgba(40,34,30,' + (0.14*amt) + ')'; g.lineWidth = 1.5;
+  for (let i = 0; i < 5; i++){
+    let x = rnd()*512, y = rnd()*512;
+    g.beginPath(); g.moveTo(x, y);
+    const steps = 3 + (rnd()*4|0);
+    for (let s = 0; s < steps; s++){
+      x += (rnd()-0.5)*140; y += (rnd()-0.5)*140;
+      g.lineTo(x, y);
+    }
+    g.stroke();
+  }
+  g.restore();
+}
+
+// moss and lichen creeping over the stone — pools along the lower edge and in
+// corners where damp collects, thinning toward the top. amount 0..1 grows it.
+function drawVegetation(g, fi, amt){
+  const rnd = seededRand((fi*40503 + 907) >>> 0);
+  g.save();
+  const greens = ['#6f8f4e', '#7fa05a', '#5c7d42', '#8aa668', '#647f48'];
+  // patches: probability weighted toward the bottom of the face (higher y)
+  const n = Math.round(60 + amt * 200);
+  for (let i = 0; i < n; i++){
+    // bias y downward: moss grows up from the base
+    const yb = Math.pow(rnd(), 0.5);          // skew toward 1 (bottom)
+    if (rnd() > amt * (0.35 + 0.65*yb)) continue;   // sparser higher up
+    const x = rnd()*512, y = yb*512;
+    const r = 6 + rnd()*34;
+    const col = greens[(rnd()*greens.length)|0];
+    const a = 0.10 + rnd()*0.28;
+    const grad = g.createRadialGradient(x, y, 0, x, y, r);
+    grad.addColorStop(0, hexA(col, a));
+    grad.addColorStop(0.7, hexA(col, a*0.5));
+    grad.addColorStop(1, hexA(col, 0));
+    g.fillStyle = grad;
+    g.beginPath(); g.arc(x, y, r, 0, Math.PI*2); g.fill();
+  }
+  // speckle of brighter lichen dots on top of the moss
+  const dots = Math.round(amt * 400);
+  for (let i = 0; i < dots; i++){
+    const yb = Math.pow(rnd(), 0.6);
+    g.fillStyle = hexA(greens[(rnd()*greens.length)|0], 0.25);
+    g.fillRect(rnd()*512, yb*512, 2 + rnd()*3, 2 + rnd()*3);
+  }
+  g.restore();
+}
+function hexA(hex, a){
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return 'rgba(' + r + ',' + g + ',' + b + ',' + a + ')';
+}
+const cubeMats = FACES.map((f, fi) => {
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  faceCanvases.push(c);
+  drawFaceBase(fi);
+  const t = new THREE.CanvasTexture(c);
+  t.anisotropy = 4;
+  faceTextures.push(t);
+  return new THREE.MeshLambertMaterial({ map:t, alphaTest:0.5 });
+});
+const cubeMesh = new THREE.Mesh(new THREE.BoxGeometry(2*H, 2*H, 2*H), cubeMats);
+cubeMesh.receiveShadow = true;
+world.add(cubeMesh);
+
+// Maps a cube-local point to face-texture pixels. Derived from BoxGeometry's
+// buildPlane UV conventions per face (order: +x,-x,+y,-y,+z,-z):
+// [uComponent, uDir, vComponent, vDir] with s = .5 + cu/(2H*uDir), t = .5 - cv/(2H*vDir)
+const UV_TABLE = [
+  [2,-1, 1,-1],  // +x
+  [2, 1, 1,-1],  // -x
+  [0, 1, 2, 1],  // +y
+  [0, 1, 2,-1],  // -y
+  [0, 1, 1,-1],  // +z
+  [0,-1, 1,-1],  // -z
+];
+function updateFaceTextures(){
+  for (let fi = 0; fi < 6; fi++) drawFaceBase(fi);
+  const sz = (512/N) * (HOLE_OPEN/CELL);
+  for (const [fi,u,v] of holeList.concat(portalList)){
+    const p = cellToPoint(fi, u, v);
+    const [uc, ud, vc, vd] = UV_TABLE[fi];
+    const s = 0.5 + p.getComponent(uc) / (2*H*ud);
+    const t = 0.5 - p.getComponent(vc) / (2*H*vd);
+    faceCanvases[fi].getContext('2d')
+      .clearRect(s*512 - sz/2, (1-t)*512 - sz/2, sz, sz);
+  }
+  for (const tx of faceTextures) tx.needsUpdate = true;
+}
+
+// ---------- face / cell helpers ----------
+function faceIndexOf(normal){
+  for (let i=0;i<FACES.length;i++) if (FACES[i].n.dot(normal) > 0.9) return i;
+  return 2;
+}
+function basisOf(normal){
+  const perp = AXES.filter(a => Math.abs(a.dot(normal)) < 0.5 && (a.x+a.y+a.z) > 0);
+  return [perp[0], perp[1]];
+}
+function cellToPoint(faceIdx, u, v){
+  const f = FACES[faceIdx];
+  const [ta, tb] = basisOf(f.n);
+  const p = f.n.clone().multiplyScalar(H);
+  p.addScaledVector(ta, (u - (N-1)/2) * CELL);
+  p.addScaledVector(tb, (v - (N-1)/2) * CELL);
+  return p;
+}
+function pointToCell(faceIdx, p){
+  const [ta, tb] = basisOf(FACES[faceIdx].n);
+  return {
+    u: Math.round(p.dot(ta)/CELL + (N-1)/2),
+    v: Math.round(p.dot(tb)/CELL + (N-1)/2)
+  };
+}
+const cellKey = (fi,u,v) => fi + ',' + u + ',' + v;
+
+// ---------- player ----------
+const PSIZE = CELL * 0.62;
+const player = new THREE.Mesh(
+  new THREE.BoxGeometry(PSIZE, PSIZE, PSIZE),
+  new THREE.MeshLambertMaterial({ color:0xfaf5ea })
+);
+player.castShadow = true;
+world.add(player);
+
+const P = cellToPoint(2, 2, 2);
+const Nf = FACES[2].n.clone();
+const _upY = new THREE.Vector3(0,1,0);
+function playerTargetQuat(){
+  return new THREE.Quaternion().setFromUnitVectors(_upY, Nf);
+}
+function faceLift(fi){ return pathFaces.has(fi) ? TILE_H : 0; }
+function placePlayer(pos){
+  player.position.copy(pos)
+    .addScaledVector(Nf, PSIZE/2 + 0.01 + faceLift(faceIndexOf(Nf)));
+}
+
+// ---------- level content (rebuilt every level) ----------
+let levelGroup = null;
+const blocked = new Set();
+
+// ---------- bevelled blocks ----------
+// three r128 has no rounded box, so build one: subdivide a box and project
+// every vertex onto a rounded-box surface (clamp to the inner box, push out
+// by the radius). Gives a true bevel on all twelve edges and eight corners.
+function makeRoundedBox(w, h, d, r, seg){
+  const g = new THREE.BoxGeometry(w, h, d, seg, seg, seg);
+  const pos = g.attributes.position;
+  const cx = w/2 - r, cy = h/2 - r, cz = d/2 - r;
+  const v = new THREE.Vector3(), c = new THREE.Vector3();
+  for (let i = 0; i < pos.count; i++){
+    v.fromBufferAttribute(pos, i);
+    c.set(
+      Math.max(-cx, Math.min(cx, v.x)),
+      Math.max(-cy, Math.min(cy, v.y)),
+      Math.max(-cz, Math.min(cz, v.z)));
+    v.sub(c);
+    const len = v.length();
+    if (len > 1e-6) v.multiplyScalar(r / len);
+    pos.setXYZ(i, c.x + v.x, c.y + v.y, c.z + v.z);
+  }
+  pos.needsUpdate = true;
+  g.computeVertexNormals();
+  return g;
+}
+const bevelAmt = () => featureOn('bevel') ? FEATURES.bevel.slider.value / 100 : 0;
+
+// A box with all twelve edges softened. Three r128 has no bevelled box, so:
+// extrude a rounded-corner square (rounds the 4 vertical edges) with bevelling
+// enabled (rounds the 8 top/bottom edges). The result catches light along
+// every corner — the trick that makes low-poly geometry look crafted.
+function makeBevelBox(w, h, d, r){
+  r = Math.min(r, Math.min(w, d) * 0.32, h * 0.45);
+  const x = w/2 - r, z = d/2 - r;
+  const shape = new THREE.Shape();
+  shape.moveTo(-x, -d/2);
+  shape.lineTo(x, -d/2);
+  shape.quadraticCurveTo(w/2, -d/2, w/2, -z);
+  shape.lineTo(w/2, z);
+  shape.quadraticCurveTo(w/2, d/2, x, d/2);
+  shape.lineTo(-x, d/2);
+  shape.quadraticCurveTo(-w/2, d/2, -w/2, z);
+  shape.lineTo(-w/2, -z);
+  shape.quadraticCurveTo(-w/2, -d/2, -x, -d/2);
+  const g = new THREE.ExtrudeGeometry(shape, {
+    depth: h - r*2, bevelEnabled: true,
+    bevelThickness: r, bevelSize: r, bevelSegments: 2, curveSegments: 3,
+  });
+  g.rotateX(-Math.PI/2);                      // extrude axis z -> y
+  g.translate(0, -(h/2 - r) + r, 0);          // recentre on the origin
+  g.computeVertexNormals();
+  return g;
+}
+
+// block geometry is rebuilt when the bevel amount changes
+function bevelAmount(){
+  return featureOn('bevel') ? CELL * FEATURES.bevel.slider.value / 100 : 0;
+}
+function buildBlockGeo(){
+  const r = bevelAmount();
+  if (r < 0.001) return new THREE.BoxGeometry(BLOCK, CELL, BLOCK);
+  return makeBevelBox(BLOCK, CELL, BLOCK, r);
+}
+
+let BLOCK = CELL;           // block footprint, driven by the BLOCK GAP slider
+function blockSize(){
+  const gap = featureOn('blockGap') ? FEATURES.blockGap.slider.value / 100 : 0;
+  return CELL * (1 - gap);
+}
+const stoneA = new THREE.MeshLambertMaterial({ color:0xded0c2 });
+const stoneB = new THREE.MeshLambertMaterial({ color:0xcdbcae });
+const capMat = new THREE.MeshLambertMaterial({ color:0xe08e79 });
+
+// Curated stone palettes, each a cohesive pair of course tones plus a cap
+// accent, tuned to sit against the saturated pastel faces without competing.
+// Kept light and low-saturation so the coloured faces stay the loud element.
+const STONE_PALETTES = [
+  { name:'Warm Stone',  a:0xded0c2, b:0xcdbcae, cap:0xe08e79 },  // original earthy beige
+  { name:'Bone',        a:0xf2ece1, b:0xe4dccd, cap:0xd98c74 },  // pale porcelain
+  { name:'Sandstone',   a:0xe6d3ac, b:0xd4bd93, cap:0xcf8b5a },  // golden desert
+  { name:'Cool Grey',   a:0xd8dade, b:0xc3c6cc, cap:0x9aa6b2 },  // neutral slate
+  { name:'Blush Stone', a:0xecdcda, b:0xdcc7c6, cap:0xc98d8f },  // faint warm pink
+  { name:'Lavender Ash',a:0xd9d6e0, b:0xc6c2d2, cap:0x9d93b8 },  // cool violet-grey
+  { name:'Chalk',       a:0xf0f0ee, b:0xe1e2e2, cap:0xb9b4ac },  // near-white minimal
+];
+// smooth value noise over 3D position — used to pool moss and band weathering
+// across the whole cube surface, flowing over block boundaries. Deterministic.
+function vnoise(x, y, z){
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const xf = x - xi, yf = y - yi, zf = z - zi;
+  const fade = t => t*t*t*(t*(t*6-15)+10);
+  const h = (a,b,c) => {
+    let n = (a*374761393 + b*668265263 + c*2147483647) >>> 0;
+    n = (n ^ (n >>> 13)) * 1274126177 >>> 0;
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967295;
+  };
+  const u = fade(xf), v = fade(yf), w = fade(zf);
+  const lerp = (a,b,t) => a + (b-a)*t;
+  return lerp(
+    lerp(lerp(h(xi,yi,zi),   h(xi+1,yi,zi),   u), lerp(h(xi,yi+1,zi),   h(xi+1,yi+1,zi),   u), v),
+    lerp(lerp(h(xi,yi,zi+1), h(xi+1,yi,zi+1), u), lerp(h(xi,yi+1,zi+1), h(xi+1,yi+1,zi+1), u), v),
+    w);
+}
+// fractal noise: a couple of octaves for more organic pooling
+function fnoise(x, y, z){
+  return vnoise(x, y, z) * 0.65 + vnoise(x*2.3+11, y*2.3+7, z*2.3+3) * 0.35;
+}
+
+function applyPalette(){
+  const idx = featureOn('palette')
+    ? Math.max(0, Math.min(STONE_PALETTES.length - 1, FEATURES.palette.slider.value)) : 0;
+  const p = STONE_PALETTES[idx];
+  // clear any old texture maps (superseded by world-space tinting)
+  for (const mat of [stoneA, stoneB]){ if (mat.map){ mat.map.dispose(); mat.map = null; mat.needsUpdate = true; } }
+  stoneA.color.setHex(p.a);
+  stoneB.color.setHex(p.b);
+  capMat.color.setHex(p.cap);
+  clearTintCache();                   // tinted clones derive from these — refresh
+}
+
+// A box with chamfered edges. Built by extruding a rounded rectangle profile
+// with a bevel on the extrusion — so every edge catches a sliver of light,
+// which is what separates 'crafted' low-poly from 'default cube'.
+function bevelledBox(w, h, d, r){
+  if (r < 0.0015) return new THREE.BoxGeometry(w, h, d);
+  r = Math.min(r, w/2 - 0.002, h/2 - 0.002, d/2 - 0.002);
+  // ExtrudeGeometry's bevelSize expands the profile OUTWARD by r on every side,
+  // and bevelThickness adds r to each end of the extrusion — so the profile is
+  // inset by r and the depth shortened by 2r to land on the requested size.
+  const iw = w/2 - r, id = d/2 - r;          // inset half-extents
+  const cr = Math.min(r, iw*0.5, id*0.5);    // corner rounding within the inset
+  const sw = iw - cr, sd = id - cr;
+  const shape = new THREE.Shape();
+  shape.moveTo(-sw, -id);
+  shape.lineTo(sw, -id);
+  shape.quadraticCurveTo(iw, -id, iw, -sd);
+  shape.lineTo(iw, sd);
+  shape.quadraticCurveTo(iw, id, sw, id);
+  shape.lineTo(-sw, id);
+  shape.quadraticCurveTo(-iw, id, -iw, sd);
+  shape.lineTo(-iw, -sd);
+  shape.quadraticCurveTo(-iw, -id, -sw, -id);
+  const g = new THREE.ExtrudeGeometry(shape, {
+    depth: h - r*2, bevelEnabled: true,
+    bevelSize: r, bevelThickness: r, bevelSegments: 2, curveSegments: 2,
+  });
+  g.rotateX(-Math.PI/2);                     // extrude along +y
+  g.translate(0, -(h/2 - r), 0);             // recentre on the origin
+  g.computeVertexNormals();
+  return g;
+}
+function bevelAmount(){
+  return featureOn('bevels') ? FEATURES.bevels.slider.value / 100 * CELL * 0.09 : 0;
+}
+
+let blockGeo = null, blockEdges = null;
+const edgeMat = new THREE.LineBasicMaterial({ color:0x5c4a5e, transparent:true, opacity:0.3 });
+
+// rebuild the block geometry when the bevel size changes
+function applyBevels(){
+  BLOCK = blockSize();       // pick up the current gap setting
+  const r = bevelAmount();
+  if (blockGeo) blockGeo.dispose();
+  if (blockEdges) blockEdges.dispose();
+  blockGeo = bevelledBox(BLOCK, CELL, BLOCK, r);
+  blockEdges = new THREE.EdgesGeometry(blockGeo, 30);
+  // the bevel does the edge-definition job with light, so the ink can back off
+  edgeMat.opacity = r > 0.0015 ? 0.12 : 0.3;
+}
+applyBevels();                 // build the initial geometry
+
+// Stone variation: a stable per-cell lightness shift so no two blocks match,
+// yet a given block is always the same shade (a hash of its cell, not random —
+// otherwise it would shimmer on every rebuild). Cloned materials are cached and
+// reused so we don't make hundreds of them per level.
+function cellHash(fi, u, v, i){
+  let h = (fi*131 + u*17 + v*7 + i*4099) >>> 0;
+  h = (h ^ (h >>> 13)) * 0x5bd1e995 >>> 0;
+  h = (h ^ (h >>> 15)) >>> 0;
+  return h / 4294967295;                 // 0..1
+}
+const tintCache = new Map();
+function clearTintCache(){
+  for (const mat of tintCache.values()){ if (mat.map) mat.map.dispose(); }
+  tintCache.clear();
+}
+let tintTimer = null, monTimer = null, gapTimer = null, masTimer = null, palTimer = null;
+const _mossCol = new THREE.Color(0x6f8f4e);
+// per-block weathered texture: painted by sampling the shared noise field at
+// the block's WORLD position, so the fine mottled detail (real moss/staining,
+// not a flat tint) flows continuously across blocks and never repeats.
+function makeWeatherTex(baseHex, wx, wy, wz, weather, moss){
+  const S = 64;
+  const c = document.createElement('canvas'); c.width = c.height = S;
+  const g = c.getContext('2d');
+  const base = new THREE.Color(baseHex);
+  const img = g.createImageData(S, S);
+  const dat = img.data;
+  const mCol = _mossCol;
+  for (let py = 0; py < S; py++){
+    for (let px = 0; px < S; px++){
+      // world coord of this texel: block origin + fraction across the block
+      const fx = px / S, fy = py / S;
+      const sx = wx + fx * 1.0, sy = wy + fy * 1.0, sz = wz;
+      // sample noise at several scales: low for regional pooling, high for the
+      // fine mottle within a block that makes it read as moss, not a flat fill
+      const wN = fnoise(sx*1.6+40, sy*1.6+40, sz*1.6+40) * 0.6
+               + fnoise(sx*9.0+40, sy*9.0+40, sz*9.0+40) * 0.4;
+      const mN = fnoise(sx*1.3, sy*1.3, sz*1.3) * 0.45
+               + fnoise(sx*5.0, sy*5.0, sz*5.0) * 0.30
+               + fnoise(sx*13.0, sy*13.0, sz*13.0) * 0.25;
+      let rr = base.r, gg = base.g, bb = base.b;
+      // weathering: darken where the field is high, lighten where low — mottle
+      if (weather > 0){
+        const d = (wN - 0.5) * weather * 0.5;
+        rr -= d; gg -= d; bb -= d;
+      }
+      // moss: blend toward green where the moss field is high. The threshold
+      // pulls back hard at low slider values so moss stays in pools/patches
+      // rather than blanketing — only the greenest areas grow at low settings.
+      if (moss > 0){
+        const thresh = 0.72 - moss * 0.42;      // 0.72 (sparse) -> 0.30 (lush)
+        const cover = Math.max(0, mN - thresh) / (1 - thresh) * (0.6 + moss*0.4);
+        const k = Math.min(0.82, cover);
+        rr = rr + (mCol.r - rr) * k;
+        gg = gg + (mCol.g - gg) * k;
+        bb = bb + (mCol.b - bb) * k;
+      }
+      const o = (py*S + px) * 4;
+      dat[o]   = Math.max(0, Math.min(255, rr*255));
+      dat[o+1] = Math.max(0, Math.min(255, gg*255));
+      dat[o+2] = Math.max(0, Math.min(255, bb*255));
+      dat[o+3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(c);
+  t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearFilter;
+  return t;
+}
+
+function stoneMat(base, fi, u, v, i){
+  const tintOn = featureOn('tint');
+  const weather = featureOn('palette') ? FEATURES.palette.sliders[0].value / 100 : 0;
+  const moss    = featureOn('palette') ? FEATURES.palette.sliders[1].value / 100 : 0;
+
+  // plain per-block lightness variation only (no weathering/moss): cheap tinted clone
+  if (weather <= 0 && moss <= 0){
+    if (!tintOn) return base;
+    const amt = FEATURES.tint.slider.value / 100;
+    if (amt <= 0) return base;
+    const shift = (cellHash(fi, u, v, i) - 0.5) * 2 * 0.14 * amt;
+    const step = Math.round(shift * 40);
+    const key = (base === stoneA ? 'A' : 'B') + step;
+    let mat = tintCache.get(key);
+    if (!mat){
+      mat = base.clone();
+      const hsl = {}; base.color.getHSL(hsl);
+      mat.color.setHSL(hsl.h, hsl.s, Math.max(0, Math.min(1, hsl.l + step/40)));
+      tintCache.set(key, mat);
+    }
+    return mat;
+  }
+
+  // weathering/moss on: per-block texture sampled at world position. Quantise
+  // the position to a grid so nearby blocks can share a cached texture — keeps
+  // the material count sane while still flowing across the surface.
+  const wx = fi*4 + u, wy = v + i, wz = (u + v*7 + fi*13) * 0.13;
+  const gx = Math.round(wx), gy = Math.round(wy), gz = Math.round(wz*3);
+  const key = (base === stoneA ? 'A' : 'B') + 'w' + Math.round(weather*10)
+            + 'm' + Math.round(moss*10) + ':' + gx + ',' + gy + ',' + gz;
+  let mat = tintCache.get(key);
+  if (!mat){
+    mat = base.clone();
+    mat.color.setHex(0xffffff);            // texture carries the colour
+    mat.map = makeWeatherTex('#'+base.color.getHexString(), gx, gy, gz*0.33, weather, moss);
+    mat.needsUpdate = true;
+    tintCache.set(key, mat);
+  }
+  return mat;
+}
+
+// ---------- monuments: occasional landmarks, one cell each ----------
+// Each occupies a single cell's footprint exactly as a block does, so it
+// registers as an ordinary blocked cell — the movement graph and solvability
+// system never know the difference. Pure silhouette on top of a normal block.
+function addMonument(kind, faceIdx, u, v){
+  blocked.add(cellKey(faceIdx, u, v));
+  const f = FACES[faceIdx];
+  const base = cellToPoint(faceIdx, u, v);
+  const q = new THREE.Quaternion().setFromUnitVectors(_upY, f.n);
+  const g = new THREE.Group();
+  g.position.copy(base);
+  g.quaternion.copy(q);
+  levelGroup.add(g);
+  const mk = (w, h, d, up, mat) => {
+    const m = new THREE.Mesh(bevelledBox(w, h, d, bevelAmount()), mat || stoneA);
+    m.position.set(0, up + h/2, 0);   // local: +y is out of the face
+    m.castShadow = true; m.receiveShadow = true;
+    g.add(m);
+    return m;
+  };
+  const tint = (i) => stoneMat(i % 2 ? stoneB : stoneA, faceIdx, u, v, i);
+
+  if (kind === 'ziggurat'){
+    // three stacked tiers, each smaller — a stepped monument
+    mk(BLOCK,        CELL*0.5, BLOCK,        0,        tint(0));
+    mk(BLOCK*0.68,   CELL*0.42, BLOCK*0.68,  CELL*0.5, tint(1));
+    mk(BLOCK*0.38,   CELL*0.36, BLOCK*0.38,  CELL*0.92, tint(2));
+  } else if (kind === 'obelisk'){
+    // a broad-based tapering monument — wide foot, narrowing to a capped point
+    const foot = mk(BLOCK*0.72, CELL*0.4, BLOCK*0.72, 0, tint(0));   // solid plinth
+    const shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(BLOCK*0.2, BLOCK*0.46, CELL*1.5, 4),
+      tint(1));
+    shaft.position.set(0, CELL*0.4 + CELL*0.75, 0);
+    shaft.rotation.y = Math.PI/4;
+    shaft.castShadow = true; shaft.receiveShadow = true;
+    g.add(shaft);
+    // a small pyramid cap
+    const cap = new THREE.Mesh(new THREE.ConeGeometry(BLOCK*0.21, CELL*0.4, 4), capMat);
+    cap.position.set(0, CELL*0.4 + CELL*1.5 + CELL*0.2, 0);
+    cap.rotation.y = Math.PI/4;
+    cap.castShadow = true;
+    g.add(cap);
+  } else if (kind === 'stepPyramid'){
+    // a squat stepped pyramid — four shrinking tiers, low and broad
+    mk(BLOCK,      CELL*0.32, BLOCK,      0,        tint(0));
+    mk(BLOCK*0.76, CELL*0.30, BLOCK*0.76, CELL*0.32, tint(1));
+    mk(BLOCK*0.52, CELL*0.28, BLOCK*0.52, CELL*0.62, tint(2));
+    mk(BLOCK*0.28, CELL*0.26, BLOCK*0.28, CELL*0.90, tint(3));
+  } else if (kind === 'pillars'){
+    // a pair of standing stones flanking a low slab — a shrine
+    const l = mk(BLOCK*0.26, CELL*1.25, BLOCK*0.34, 0, tint(0)); l.position.x = -BLOCK*0.3;
+    const r2 = mk(BLOCK*0.26, CELL*1.25, BLOCK*0.34, 0, tint(1)); r2.position.x = BLOCK*0.3;
+    mk(BLOCK*0.5, CELL*0.3, BLOCK*0.5, 0, tint(2));                // low altar between
+  } else if (kind === 'monolith'){
+    // a single leaning slab — a standing stone, tilted just off vertical
+    const slab = mk(BLOCK*0.5, CELL*1.6, BLOCK*0.28, 0, tint(0));
+    slab.rotation.z = 0.11;
+    slab.position.x = -CELL*0.08;
+  } else if (kind === 'cairn'){
+    // a rough pile — stacked stones of shrinking size, slightly offset
+    const seed = seededRand((faceIdx*31 + u*7 + v*13 + 61) >>> 0);
+    let yy = 0;
+    const tiers = 4;
+    for (let i = 0; i < tiers; i++){
+      const sz = BLOCK * (0.8 - i*0.16);
+      const hh = CELL * (0.34 - i*0.04);
+      const st = mk(sz, hh, sz, yy, tint(i));
+      st.position.x = (seed() - 0.5) * BLOCK * 0.18;   // rough offset
+      st.position.z = (seed() - 0.5) * BLOCK * 0.18;
+      st.rotation.y = (seed() - 0.5) * 0.5;
+      yy += hh;
+    }
+  } else if (kind === 'arch'){
+    // two legs and a lintel — a gateway you can't pass but can see through
+    const legW = BLOCK*0.3;
+    const l1 = mk(legW, CELL*1.3, BLOCK, 0, tint(0)); l1.position.x = -BLOCK*0.32;
+    const l2 = mk(legW, CELL*1.3, BLOCK, 0, tint(1)); l2.position.x =  BLOCK*0.32;
+    mk(BLOCK, CELL*0.34, BLOCK, CELL*1.3, tint(2));   // lintel across the top
+  }
+}
+const MONUMENTS = ['ziggurat', 'obelisk', 'arch', 'stepPyramid', 'pillars', 'monolith', 'cairn'];
+const monumentCells = [];
+
+// ---------- masonry: blocks built from smaller stones ----------
+// A cell block can be laid up from several smaller stones instead of cast as
+// one — different sizes, slightly loose, like hand-set masonry. Purely visual:
+// the cell is still one blocked cell, this just fills its volume differently.
+// Deterministic per cell (hash-seeded) so a given block is always laid the same.
+function seededRand(seed){
+  let s = seed >>> 0;
+  return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967295; };
+}
+// build the little stones that fill one cell-block, into group g (local space,
+// +y out of the face), spanning y in [0, CELL]. w,d are the block footprint.
+function layStones(g, w, d, faceIdx, u, v, tier, topTier, vh){
+  const rnd = seededRand((faceIdx*131 + u*17 + v*7 + tier*2749) >>> 0);
+  const r = bevelAmount() * 0.6;
+  const rough = featureOn('masonry') ? (FEATURES.masonry.sliders[0].value / 100) : 0;
+  const inset = 0.008;                        // hairline mortar line
+  const visH = CELL * (vh || 1);              // total rendered height (visual only)
+  let placed = 0;
+  const put = (cx, cy, cz, sw, sh, sd, matIdx) => {
+    const m = new THREE.Mesh(bevelledBox(sw, sh, sd, Math.min(r, sh*0.3, sw*0.3)),
+                             stoneMat(matIdx % 2 ? stoneB : stoneA, faceIdx, u, v, tier*8 + matIdx));
+    m.position.set(cx, cy, cz);
+    m.castShadow = true; m.receiveShadow = true;
+    g.add(m);
+    placed++;
+  };
+
+  // Courses stacked bottom to top. The masonry rule: nothing rests on air, so
+  // a course can only ever be as wide as — or narrower than — the one below it.
+  // The base is always solid and full-width; breaking-up happens toward the top.
+  // more courses when the block stands taller, so extra height reads as extra
+  // stacked stones rather than one stretched course
+  const extraCourses = (vh || 1) > 1.2 ? 1 : 0;
+  const courses = 1 + (rnd() < 0.6 ? 1 : 0) + (rnd() < 0.35 ? 1 : 0) + extraCourses;
+  const heights = [];
+  for (let c = 0; c < courses; c++) heights.push(0.6 + rnd()*0.8);
+  const hSum = heights.reduce((a,b)=>a+b, 0);
+
+  // each course occupies a footprint window [lo,hi] along one axis; it must sit
+  // within the window of the course below it (so it's always supported)
+  const along = rnd() < 0.5;                  // which horizontal axis we split on
+  let winLo = 0, winHi = 1;                   // full width at the base
+  let y = 0;
+  for (let c = 0; c < courses; c++){
+    const isTop = (c === courses - 1);
+    const ch = visH * heights[c] / hSum;
+    const winW = winHi - winLo;
+
+    // how many stones this course breaks into — more likely higher up
+    const breakBias = c / Math.max(1, courses - 1);
+    const n = 1 + (rnd() < 0.4 + 0.4*breakBias ? 1 : 0) + (rnd() < 0.2*breakBias ? 1 : 0);
+    const segs = [0];
+    for (let i = 1; i < n; i++) segs.push(segs[i-1] + (0.7 + rnd()*0.6));
+    const segSpan = segs[n-1] + (0.7 + rnd()*0.6);
+
+    // the course as a whole may occupy less than the full window below (inset
+    // from one or both sides) — but always stays inside it, so it's supported
+    let cLo = winLo, cHi = winHi;
+    if (c > 0 && rough > 0 && rnd() < rough * 0.6){
+      const shrink = rnd() * rough * 0.35 * winW;
+      if (rnd() < 0.5) cLo += shrink; else cHi -= shrink;
+    }
+    const cW = cHi - cLo;
+
+    for (let s = 0; s < n; s++){
+      const p0 = (s === 0 ? 0 : segs[s]) / segSpan;
+      const p1 = (s+1 < n ? segs[s+1] : segSpan) / segSpan;
+      const lo = cLo + cW * p0, hi = cLo + cW * p1;
+      let sh = ch, cy = y + sh/2;
+
+      // roughness only erodes the TOP course: drop stones and shave heights,
+      // never touching the supporting courses below
+      if (rough > 0 && topTier && isTop){
+        const isLastPossible = (s === n - 1 && placed === 0);
+        if (rnd() < rough * 0.3 && !isLastPossible) continue;
+        const cut = rnd() * rough * 0.55 * ch;
+        sh = Math.max(CELL*0.12, ch - cut);
+        cy = y + sh/2;                         // rests on the course floor
+      }
+
+      const mid = (lo + hi) / 2 - 0.5;         // centre offset from cell centre
+      const size = (hi - lo);
+      if (along){
+        put(mid * w, cy, 0, size * w - inset, sh - inset, cW * d - inset, c*3 + s);
+      } else {
+        put(0, cy, mid * d, cW * w - inset, sh - inset, size * d - inset, c*3 + s);
+      }
+    }
+
+    // the next course must sit within THIS course's footprint window
+    winLo = cLo; winHi = cHi;
+    y += ch;
+  }
+
+  if (placed === 0){
+    put(0, CELL*0.3, 0, w - inset, CELL*0.6, d - inset, 0);
+  }
+  return placed;
+}
+
+// Purely-visual height variation for masonry obstacle blocks: a tumbledown
+// skyline where some render short, some full, some with an extra course
+// stacked above. This does NOT touch the logical `height` — the cell is still
+// the same solid obstacle in routing; only what's drawn changes.
+function masonryVisualHeight(faceIdx, u, v){
+  const hv = featureOn('masonry') ? FEATURES.masonry.sliders[1].value / 100 : 0;
+  if (hv <= 0) return 1;                          // full cube, as before
+  const r = cellHash(faceIdx, u, v, 5171);
+  // map to discrete levels so it reads as whole stones/courses, not a smooth
+  // stretch: 0.35, 0.5, 0.7, 1.0 (full), 1.35, 1.7 — biased toward full
+  const levels = [0.35, 0.5, 0.7, 1.0, 1.0, 1.0, 1.35, 1.7];
+  const pick = levels[Math.floor(r * levels.length)];
+  // hv scales how far from full we allow: at low hv most stay near 1
+  return 1 + (pick - 1) * hv;
+}
+
+function addStack(faceIdx, u, v, height, cap){
+  blocked.add(cellKey(faceIdx, u, v));
+  const f = FACES[faceIdx];
+  const base = cellToPoint(faceIdx, u, v);
+  const q = new THREE.Quaternion().setFromUnitVectors(_upY, f.n);
+  const masO = featureOn('masonry') ? FEATURES.masonry.slider.value / 100 : 0;
+  // visual height only applies to the topmost tier of a masonry stack
+  const vHeight = masonryVisualHeight(faceIdx, u, v);
+  for (let i = 0; i < height; i++){
+    // this tier is either one cast block or laid up from smaller stones
+    const rnd = (cellHash(faceIdx, u, v, i * 977) );
+    const isTop = (i === height - 1);
+    if (masO > 0 && rnd < masO){
+      const g = new THREE.Group();
+      g.position.copy(base).addScaledVector(f.n, CELL * i);
+      g.quaternion.copy(q);
+      levelGroup.add(g);
+      // only the top tier stretches/shrinks visually; lower tiers stay solid
+      layStones(g, BLOCK, BLOCK, faceIdx, u, v, i, isTop, isTop ? vHeight : 1);
+    } else {
+      const m = new THREE.Mesh(blockGeo, stoneMat(i % 2 ? stoneB : stoneA, faceIdx, u, v, i));
+      m.position.copy(base).addScaledVector(f.n, CELL * (i + 0.5));
+      m.quaternion.copy(q);
+      m.castShadow = true; m.receiveShadow = true;
+      m.add(new THREE.LineSegments(blockEdges, edgeMat));
+      levelGroup.add(m);
+    }
+  }
+  if (cap){
+    const c = new THREE.Mesh(new THREE.ConeGeometry(BLOCK*0.62, CELL*0.8, 4), capMat);
+    c.castShadow = true;
+    c.position.copy(base).addScaledVector(f.n, CELL * height + CELL * 0.4);
+    c.quaternion.copy(q);
+    c.rotateOnAxis(_upY, Math.PI/4);
+    levelGroup.add(c);
+  }
+}
+
+// rails: shelved system, kept ready
+const rails = new Set();
+const oneways = new Map();        // cellKey -> allowed exit direction (Vector3)
+const onewayMeshes = [];
+let gauntletSpine = null;         // Set of spine cellKeys (the intended path)
+const wallRep = new Map();        // seamKey -> [fi,u,v,dir] mesh representative
+const gauntletWallSeams = new Set(); // spine seams walled for portal bridges
+const railKey = p =>
+  Math.round(p.x/(CELL/2)) + ',' + Math.round(p.y/(CELL/2)) + ',' + Math.round(p.z/(CELL/2));
+const RAIL_H = CELL * 0.22, RAIL_W = CELL * 0.09;
+const railMat = new THREE.MeshLambertMaterial({ color:0x7a6a80 });
+const railGeo = new THREE.BoxGeometry(CELL * 1.06, RAIL_H, RAIL_W);
+// wall whose run reaches the rim: its end is MITRED at 45° — cut on the same
+// bisector plane the edge fins stand on, so wrap-around walls meet each other
+// (and the fins) perfectly flush, like picture framing
+function makeMiterWallGeo(){
+  const L = CELL * 0.53 + CELL * 0.5;   // inner overhang to the rim
+  const E = 0.008;                      // hair's-width back-off: two meeting
+  const s = new THREE.Shape();          // mitres never share the same plane
+  s.moveTo(0, 0);
+  s.lineTo(L - E, 0);
+  s.lineTo(L + RAIL_H - E, RAIL_H);     // 45° mitre, backed off by E
+  s.lineTo(0, RAIL_H);
+  s.lineTo(0, 0);
+  const g = new THREE.ExtrudeGeometry(s, { depth: RAIL_W, bevelEnabled:false });
+  g.translate(0, 0, -RAIL_W/2);
+  return g;
+}
+const railMiterGeo = makeMiterWallGeo();
+// flat rim end for walls with nothing to meet: square cut exactly at the edge,
+// anchored at the inner end like the mitre so both position identically
+const RAIL_RUN = CELL * 1.03;
+const railFlatGeo = new THREE.BoxGeometry(RAIL_RUN, RAIL_H, RAIL_W);
+railFlatGeo.translate(RAIL_RUN/2, RAIL_H/2, 0);
+
+function addRail(faceIdx, u, v, dir){
+  const f = FACES[faceIdx];
+  const [ta, tb] = basisOf(f.n);
+  const axis = (dir[1] === 'u' ? ta : tb).clone().multiplyScalar(dir[0] === '+' ? 1 : -1);
+  const along = dir[1] === 'u' ? tb : ta;
+  const m = cellToPoint(faceIdx, u, v).addScaledVector(axis, CELL/2);
+  rails.add(railKey(m));
+
+  const zl = new THREE.Vector3().crossVectors(along, f.n);
+  const q = new THREE.Quaternion().setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(along, f.n, zl));
+
+  const onCubeEdge = Math.abs(m.dot(axis)) > H - 1e-4;
+  if (onCubeEdge){
+    // an edge-running wall is a single standard-thickness fin standing on the
+    // edge's angular bisector — one wall doing one wall's job
+    const up = f.n.clone().add(axis).normalize();
+    const fin = new THREE.Mesh(railGeo, railMat);
+    fin.castShadow = true; fin.receiveShadow = true;
+    fin.position.copy(m).addScaledVector(up, RAIL_H/2);
+    fin.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+      along, up, new THREE.Vector3().crossVectors(along, up)));
+    levelGroup.add(fin);
+    return;
+  }
+
+  // in-face wall; if its run reaches the rim, the end depends on context:
+  // something continues past it (a wrapping wall on the far face, or an edge
+  // fin flanking the endpoint) -> 45° mitre to meet it flush.
+  // nothing continues (open edge passage) -> clean flat cut at the rim.
+  const runCoord = m.dot(along);
+  const atEdge = Math.abs(runCoord) > H - CELL/2 - 1e-4;
+  if (atEdge){
+    const sgn = Math.sign(runCoord);
+    const end = m.clone().addScaledVector(along, sgn * CELL/2);      // on the edge
+    const mirror = m.clone().addScaledVector(along, sgn * CELL/2)
+                            .addScaledVector(f.n, -CELL/2);          // seam across the rim
+    const hasPartner =
+      rails.has(railKey(mirror)) ||
+      rails.has(railKey(end.clone().addScaledVector(axis,  CELL/2))) ||
+      rails.has(railKey(end.clone().addScaledVector(axis, -CELL/2)));
+    const xDir = along.clone().multiplyScalar(sgn);
+    const mesh = new THREE.Mesh(hasPartner ? railMiterGeo : railFlatGeo, railMat);
+    mesh.castShadow = true; mesh.receiveShadow = true;
+    mesh.position.copy(m).addScaledVector(along, -sgn * CELL * 0.53);
+    mesh.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+      xDir, f.n, new THREE.Vector3().crossVectors(xDir, f.n)));
+    levelGroup.add(mesh);
+    return;
+  }
+  const mesh = new THREE.Mesh(railGeo, railMat);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  mesh.position.copy(m).addScaledVector(f.n, RAIL_H/2);
+  mesh.quaternion.copy(q);
+  levelGroup.add(mesh);
+}
+
+// walkway tiles: shelved system, kept ready
+const pathFaces = new Set();
+const pathCells = new Set();
+const TILE_H = CELL * 0.12;
+const tileMat = new THREE.MeshLambertMaterial({ color:0xf6ecdc });
+const tileGeo = new THREE.BoxGeometry(CELL * 0.98, TILE_H, CELL * 0.98);
+function addPath(faceIdx, cells){
+  pathFaces.add(faceIdx);
+  const f = FACES[faceIdx];
+  const q = new THREE.Quaternion().setFromUnitVectors(_upY, f.n);
+  for (const [u, v] of cells){
+    pathCells.add(cellKey(faceIdx, u, v));
+    const t = new THREE.Mesh(tileGeo, tileMat);
+    t.position.copy(cellToPoint(faceIdx, u, v)).addScaledVector(f.n, TILE_H/2);
+    t.quaternion.copy(q);
+    levelGroup.add(t);
+  }
+}
+
+function walkable(faceIdx, u, v){
+  if (blocked.has(cellKey(faceIdx, u, v))) return false;
+  if (pathFaces.has(faceIdx) && !pathCells.has(cellKey(faceIdx, u, v))) return false;
+  return true;
+}
+
+// ---------- surface graph ----------
+// Neighbours in the true movement graph. NOTE: any feature that changes how
+// the player moves MUST be taught here — the solvability check, the clock, and
+// the solution trail all walk this graph. If it lies, they all lie.
+function neighborsOf(fi, u, v, _hops){
+  const out = [];
+  // stepping onto a portal doesn't let you walk on from it: it delivers you to
+  // the partner, so this cell's real exits are the partner's exits.
+  const here = cellKey(fi, u, v);
+  const link = portals.get(here);
+  if (link && link.pair && (_hops || 0) < 4){
+    const [pf, pu, pv] = link.pair.split(',').map(Number);
+    return neighborsOf(pf, pu, pv, (_hops || 0) + 1);
+  }
+  // one-way cell: you may only leave in the arrow's direction. This makes the
+  // graph DIRECTED — the solvability check, clock, and solution trail all walk
+  // this same function, so teaching it here keeps all three honest.
+  const oneWay = oneways.get(here);
+  const n = FACES[fi].n;
+  const [ta, tb] = basisOf(n);
+  const P0 = cellToPoint(fi, u, v);
+  for (const base of [ta, tb]){
+    for (const s of [1, -1]){
+      const d = base.clone().multiplyScalar(s);
+      // one-way: skip any exit that isn't the permitted direction
+      if (oneWay && d.dot(oneWay) < 0.9) continue;
+      // a rail on this seam severs the connection
+      if (rails.has(railKey(P0.clone().addScaledVector(d, CELL/2)))) continue;
+      const cand = P0.clone().addScaledVector(d, CELL);
+      const inside =
+        Math.abs(cand.dot(ta)) <= H - CELL/2 + 1e-4 &&
+        Math.abs(cand.dot(tb)) <= H - CELL/2 + 1e-4;
+      if (inside){
+        const c = pointToCell(fi, cand);
+        out.push([fi, c.u, c.v]);
+      } else {
+        const toP = P0.clone().addScaledVector(d, CELL/2).addScaledVector(n, -CELL/2);
+        const nf = faceIndexOf(d);
+        const c = pointToCell(nf, toP);
+        out.push([nf, c.u, c.v]);
+      }
+    }
+  }
+  return out;
+}
+
+function surfaceConnected(){
+  const total = 6*N*N - blocked.size - holes.size;
+  const startK = cellKey(2,2,2);
+  if (blocked.has(startK)) return false;
+  const seen = new Set([startK]);
+  const stack = [[2,2,2]];
+  while (stack.length){
+    const [fi,u,v] = stack.pop();
+    for (const [nf,nu,nv] of neighborsOf(fi,u,v)){
+      const k = cellKey(nf,nu,nv);
+      if (seen.has(k) || blocked.has(k) || holes.has(k)) continue;
+      seen.add(k); stack.push([nf,nu,nv]);
+    }
+  }
+  return seen.size === total;
+}
+
+// ---------- procedural maze ----------
+function generateObstacles(count){
+  let placed = 0, guard = 0;
+  while (placed < count && guard++ < count * 40){
+    const fi = (Math.random()*6)|0;
+    const u = (Math.random()*N)|0, v = (Math.random()*N)|0;
+    if (fi === 2 && u === 2 && v === 2) continue;
+    const k = cellKey(fi,u,v);
+    if (blocked.has(k) || k === finishKey) continue;
+    blocked.add(k);
+    if (!surfaceConnected()){ blocked.delete(k); continue; }
+    // occasionally this landmark becomes a little monument instead of a stack.
+    // Rare by construction — most cells stay flat, so they read as landmarks.
+    const monO = featureOn('monuments') ? FEATURES.monuments.slider.value / 100 : 0;
+    if (monO > 0 && Math.random() < monO * 0.22){
+      const kind = MONUMENTS[(Math.random()*MONUMENTS.length)|0];
+      addMonument(kind, fi, u, v);
+      monumentCells.push(cellKey(fi, u, v));
+      placed++;
+      continue;
+    }
+    // mostly flat so the surface stays readable, but the occasional stack —
+    // and the rare capped tower — keeps the skyline charming. Rarity is what
+    // makes a tower a landmark instead of clutter.
+    let h = 1;
+    if (Math.random() < 0.18) h++;
+    if (Math.random() < 0.2) h++;           // ~3.5% reach three
+    addStack(fi, u, v, h, h >= 3);          // every tower gets its pyramid cap
+    placed++;
+  }
+}
+
+// procedural rails: same discipline as blocks — any rail that would seal
+// off a region is rejected, so the surface always stays one walkable whole
+function generateRails(count){
+  const dirs = ['+u','-u','+v','-v'];
+  const tmp = new THREE.Vector3();
+  let placed = 0, guard = 0;
+  while (placed < count && guard++ < count * 40){
+    const fi = (Math.random()*6)|0;
+    const u = (Math.random()*N)|0, v = (Math.random()*N)|0;
+    const dir = dirs[(Math.random()*4)|0];
+    if (blocked.has(cellKey(fi,u,v))) continue;   // seams beside open floor only
+    const [ta, tb] = basisOf(FACES[fi].n);
+    const axis = (dir[1]==='u'?ta:tb).clone().multiplyScalar(dir[0]==='+'?1:-1);
+    const key = railKey(tmp.copy(cellToPoint(fi,u,v)).addScaledVector(axis, CELL/2));
+    if (rails.has(key)) continue;
+    rails.add(key);
+    if (!surfaceConnected()){ rails.delete(key); continue; }
+    rails.delete(key);
+    addRail(fi, u, v, dir);   // re-adds the key and builds the mesh
+    placed++;
+  }
+}
+
+// holes: real recessed shafts cut into the cube — walkable, that's the trap
+const holes = new Set();
+const holeList = [];
+const HOLE_OPEN = CELL * 0.78;   // opening size (matches the alpha-cut window)
+const HOLE_DEPTH = CELL * 1.15;
+const shaftWallMat = new THREE.MeshLambertMaterial({ color:0x2c2536, side:THREE.DoubleSide });
+const shaftFloorMat = new THREE.MeshLambertMaterial({ color:0x140f1e });
+
+function addHole(faceIdx, u, v){
+  holes.add(cellKey(faceIdx, u, v));
+  holeList.push([faceIdx, u, v]);
+  const n = FACES[faceIdx].n;
+  const [ta, tb] = basisOf(n);
+  const base = cellToPoint(faceIdx, u, v);        // opening, flush with the face
+  const q = new THREE.Quaternion().setFromUnitVectors(_upY, n);
+
+  // four walls descending inward
+  const wallGeo = new THREE.PlaneGeometry(HOLE_OPEN, HOLE_DEPTH);
+  for (const [dir, side] of [[ta,1],[ta,-1],[tb,1],[tb,-1]]){
+    const w = new THREE.Mesh(wallGeo, shaftWallMat);
+    w.position.copy(base)
+      .addScaledVector(dir, side * HOLE_OPEN/2)
+      .addScaledVector(n, -HOLE_DEPTH/2);
+    // plane's +z should face inward (toward shaft center = -dir*side)
+    const zAxis = dir.clone().multiplyScalar(-side);
+    const yAxis = n.clone().multiplyScalar(-1);    // down the shaft
+    const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis);
+    w.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis));
+    levelGroup.add(w);
+  }
+  // floor at the bottom
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(HOLE_OPEN, HOLE_OPEN), shaftFloorMat);
+  floor.position.copy(base).addScaledVector(n, -HOLE_DEPTH);
+  floor.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(_planeZ, n));
+  levelGroup.add(floor);
+}
+const _planeZ = new THREE.Vector3(0,0,1);
+
+// same discipline again: a hole that would sever the only route is rejected
+function generateHoles(count){
+  let placed = 0, guard = 0;
+  while (placed < count && guard++ < count * 40){
+    const fi = (Math.random()*6)|0;
+    const u = (Math.random()*N)|0, v = (Math.random()*N)|0;
+    if (fi === 2 && u === 2 && v === 2) continue;
+    const k = cellKey(fi,u,v);
+    if (blocked.has(k) || holes.has(k) || k === finishKey) continue;
+    holes.add(k);
+    if (!surfaceConnected()){ holes.delete(k); continue; }
+    holes.delete(k);
+    addHole(fi, u, v);
+    placed++;
+  }
+}
+
+// bridges: hollow arches — pass through along the axis, the legs wall the sides.
+// The side-blocking IS the rail system: each bridge adds its two side seams to
+// the rails set, so movement rules and connectivity checks come for free.
+// The deck sits at block height, ready to become walkable when layers arrive.
+const bridged = new Set();
+const BR_CLEAR = CELL * 0.78;    // tunnel clearance (player is 0.62 tall)
+const BR_DECK_T = CELL * 0.22;
+const BR_LEG_W = CELL * 0.12;
+let bridgeLegGeo, bridgeDeckGeo, bridgeLegEdges, bridgeDeckEdges;
+function rebuildBridgeGeo(){
+  for (const g of [bridgeLegGeo, bridgeDeckGeo, bridgeLegEdges, bridgeDeckEdges])
+    if (g) g.dispose();
+  const b = bevelAmount();
+  bridgeLegGeo = bevelledBox(CELL, BR_CLEAR, BR_LEG_W, Math.min(b, BR_LEG_W*0.3));
+  bridgeDeckGeo = bevelledBox(CELL * 1.06, BR_DECK_T, CELL, Math.min(b, BR_DECK_T*0.3));
+  bridgeLegEdges = new THREE.EdgesGeometry(bridgeLegGeo, 30);
+  bridgeDeckEdges = new THREE.EdgesGeometry(bridgeDeckGeo, 30);
+}
+rebuildBridgeGeo();
+
+function addBridge(faceIdx, u, v, alongU){
+  const n = FACES[faceIdx].n;
+  const [ta, tb] = basisOf(n);
+  const along = alongU ? ta : tb;
+  const across = alongU ? tb : ta;
+  const base = cellToPoint(faceIdx, u, v);
+  const zA = new THREE.Vector3().crossVectors(along, n);
+  const q = new THREE.Quaternion().setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(along, n, zA));
+  for (const s of [1, -1]){
+    const leg = new THREE.Mesh(bridgeLegGeo, stoneB);
+    leg.castShadow = true; leg.receiveShadow = true;
+    leg.position.copy(base)
+      .addScaledVector(across, s * (CELL/2 - BR_LEG_W/2))
+      .addScaledVector(n, BR_CLEAR/2);
+    leg.quaternion.copy(q);
+    leg.add(new THREE.LineSegments(bridgeLegEdges, edgeMat));
+    levelGroup.add(leg);
+  }
+  const deck = new THREE.Mesh(bridgeDeckGeo, stoneA);
+  deck.castShadow = true; deck.receiveShadow = true;
+  deck.position.copy(base).addScaledVector(n, BR_CLEAR + BR_DECK_T/2);
+  deck.quaternion.copy(q);
+  deck.add(new THREE.LineSegments(bridgeDeckEdges, edgeMat));
+  levelGroup.add(deck);
+}
+
+function generateBridges(count){
+  const tmp = new THREE.Vector3();
+  let placed = 0, guard = 0;
+  while (placed < count && guard++ < count * 40){
+    const fi = (Math.random()*6)|0;
+    const u = 1 + ((Math.random()*(N-2))|0);   // interior cells only
+    const v = 1 + ((Math.random()*(N-2))|0);
+    if (fi === 2 && u === 2 && v === 2) continue;
+    const k = cellKey(fi,u,v);
+    if (blocked.has(k) || holes.has(k) || bridged.has(k) || k === finishKey) continue;
+    const alongU = Math.random() < 0.5;
+    const [ta, tb] = basisOf(FACES[fi].n);
+    const across = alongU ? tb : ta;
+    const c = cellToPoint(fi,u,v);
+    const k1 = railKey(tmp.copy(c).addScaledVector(across,  CELL/2));
+    const k2 = railKey(tmp.copy(c).addScaledVector(across, -CELL/2));
+    if (rails.has(k1) || rails.has(k2)) continue;
+    rails.add(k1); rails.add(k2);
+    if (!surfaceConnected()){ rails.delete(k1); rails.delete(k2); continue; }
+    bridged.add(k);
+    addBridge(fi, u, v, alongU);   // the seam keys stay: they are the walls
+    placed++;
+  }
+}
+
+// ---------- one-way tiles ----------
+// Arrows you can only cross in one direction. This makes the movement graph
+// DIRECTED, so placement must preserve reachability: after adding an arrow we
+// run a directed flood-fill from the start and reject it if it strands any
+// cell. Undirected connectivity is no longer enough.
+function directedReachCount(){
+  const start = cellKey(2,2,2);
+  const seen = new Set([start]);
+  const q = [[2,2,2]];
+  for (let h = 0; h < q.length; h++){
+    const [a,b,c] = q[h];
+    for (const [nf,nu,nv] of neighborsOf(a,b,c)){
+      const k = cellKey(nf,nu,nv);
+      if (seen.has(k) || blocked.has(k) || holes.has(k)) continue;
+      seen.add(k); q.push([nf,nu,nv]);
+    }
+  }
+  return seen.size;
+}
+function totalWalkable(){
+  let n = 0;
+  for (let fi=0; fi<6; fi++) for (let u=0; u<N; u++) for (let v=0; v<N; v++){
+    const k = cellKey(fi,u,v);
+    if (!blocked.has(k) && !holes.has(k)) n++;
+  }
+  return n;
+}
+// how many cells can reach the start (reverse reachability). Combined with
+// forward reachability, this proves strong connectivity: if every cell reaches
+// start AND start reaches every cell, then any cell can reach any other —
+// which is what a gem TOUR needs, not just single-target reachability.
+function reverseReachCount(){
+  // BFS on the REVERSED directed graph: cell X can reach start iff start is
+  // reachable following edges backward from... easier: find all cells that can
+  // reach start by checking, for each cell, whether start is forward-reachable.
+  // Cheaper: build reverse adjacency once and flood from start.
+  const revAdj = new Map();
+  const cells = [];
+  for (let fi=0; fi<6; fi++) for (let u=0; u<N; u++) for (let v=0; v<N; v++){
+    const k = cellKey(fi,u,v);
+    if (blocked.has(k) || holes.has(k)) continue;
+    cells.push([fi,u,v]);
+  }
+  for (const [fi,u,v] of cells){
+    for (const [nf,nu,nv] of neighborsOf(fi,u,v)){
+      const nk = cellKey(nf,nu,nv);
+      if (blocked.has(nk) || holes.has(nk)) continue;
+      if (!revAdj.has(nk)) revAdj.set(nk, []);
+      revAdj.get(nk).push(cellKey(fi,u,v));    // edge fi->nf reversed
+    }
+  }
+  const start = cellKey(2,2,2);
+  const seen = new Set([start]);
+  const q = [start];
+  for (let h = 0; h < q.length; h++){
+    for (const p of (revAdj.get(q[h]) || [])){
+      if (!seen.has(p)){ seen.add(p); q.push(p); }
+    }
+  }
+  return seen.size;
+}
+function generateOneWays(count){
+  const target = totalWalkable();
+  let placed = 0, tries = 0;
+  while (placed < count && tries < count * 30){
+    tries++;
+    const fi = (Math.random()*6)|0, u = (Math.random()*N)|0, v = (Math.random()*N)|0;
+    const k = cellKey(fi,u,v);
+    if (fi === 2 && u === 2 && v === 2) continue;
+    if (blocked.has(k) || holes.has(k) || oneways.has(k) || portals.has(k)) continue;
+    const exits = neighborsOf(fi, u, v);
+    if (exits.length < 2) continue;            // don't trap dead-ends
+    const [ta, tb] = basisOf(FACES[fi].n);
+    const dirs = [ta, ta.clone().negate(), tb, tb.clone().negate()];
+    const dir = dirs[(Math.random()*4)|0];
+    oneways.set(k, dir);
+    // STRONG connectivity: start reaches all AND all reach start. Only then can
+    // a gem tour always continue from wherever it currently stands.
+    if (directedReachCount() < target || reverseReachCount() < target){
+      oneways.delete(k);                        // would strand the tour — reject
+      continue;
+    }
+    placed++;
+  }
+}
+
+// draw a chevron arrow on each one-way cell, pointing the way you may leave
+const onewayGeo = (() => {
+  const shape = new THREE.Shape();
+  shape.moveTo(0.30, 0); shape.lineTo(-0.18, 0.24); shape.lineTo(-0.06, 0);
+  shape.lineTo(-0.18, -0.24); shape.closePath();
+  return new THREE.ShapeGeometry(shape);
+})();
+const onewayMat = new THREE.MeshBasicMaterial({
+  color:0xf5b942, transparent:true, opacity:0.9, side:THREE.DoubleSide,
+  depthWrite:false });
+function drawOneways(){
+  for (const [k, dir] of oneways){
+    const [fi, u, v] = k.split(',').map(Number);
+    const n = FACES[fi].n;
+    const base = cellToPoint(fi, u, v);
+    const m = new THREE.Mesh(onewayGeo, onewayMat);
+    m.position.copy(base).addScaledVector(n, CELL*0.04 + faceLift(fi));
+    const zAxis = n.clone();
+    const xAxis = dir.clone().normalize();
+    const yAxis = new THREE.Vector3().crossVectors(zAxis, xAxis);
+    m.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis));
+    m.scale.setScalar(CELL * 0.95);
+    levelGroup.add(m);
+    onewayMeshes.push(m);
+  }
+}
+
+// ---------- portals: linked doorways, matching colours connect ----------
+// Built like holes (a cut opening over a recessed shaft) but tinted per pair.
+// Step in, sink, and rise out of the partner — the cube swivels to present
+// the destination face. Portals only ADD connectivity, so every solvability
+// guarantee holds untouched.
+const portals = new Map();       // cellKey -> { pair: cellKey }
+const portalList = [];           // [fi,u,v] for texture cutting
+const portalFX = new Map();      // cellKey -> { lightMat, light, flare }
+const PORTAL_COLORS = [0xe8608a, 0x4fb3bf, 0xe0a83c, 0x8f6fd6];
+const LIGHT_H = CELL * 1.3;
+const portalLightGeo = new THREE.PlaneGeometry(HOLE_OPEN, LIGHT_H);
+// vertical fade: opaque at the mouth, dissolving into the air at the top
+const lightGradTex = (() => {
+  const c = document.createElement('canvas'); c.width = 4; c.height = 128;
+  const g = c.getContext('2d');
+  const grad = g.createLinearGradient(0, 128, 0, 0);
+  grad.addColorStop(0,    'rgba(255,255,255,0.9)');
+  grad.addColorStop(0.55, 'rgba(255,255,255,0.35)');
+  grad.addColorStop(1,    'rgba(255,255,255,0)');
+  g.fillStyle = grad; g.fillRect(0, 0, 4, 128);
+  return new THREE.CanvasTexture(c);
+})();
+
+function addPortalCell(fi, u, v, wallMat, floorMat, col){
+  const n = FACES[fi].n;
+  const [ta, tb] = basisOf(n);
+  const base = cellToPoint(fi, u, v);
+  const wallGeo = new THREE.PlaneGeometry(HOLE_OPEN, HOLE_DEPTH);
+  for (const [dir, side] of [[ta,1],[ta,-1],[tb,1],[tb,-1]]){
+    const w = new THREE.Mesh(wallGeo, wallMat);
+    w.position.copy(base)
+      .addScaledVector(dir, side * HOLE_OPEN/2)
+      .addScaledVector(n, -HOLE_DEPTH/2);
+    const zAxis = dir.clone().multiplyScalar(-side);
+    const yAxis = n.clone().multiplyScalar(-1);
+    const xAxis = new THREE.Vector3().crossVectors(yAxis, zAxis);
+    w.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis, yAxis, zAxis));
+    levelGroup.add(w);
+  }
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(HOLE_OPEN, HOLE_OPEN), floorMat);
+  floor.position.copy(base).addScaledVector(n, -HOLE_DEPTH);
+  floor.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(_planeZ, n));
+  levelGroup.add(floor);
+  // light rising straight out of the opening: four planes matching the shaft
+  // walls, brightest at the mouth, fading naturally into the air. Where they
+  // meet, the additive blend doubles — the column's corners shine brightest.
+  const lightMat = new THREE.MeshBasicMaterial({
+    color: col, map: lightGradTex, transparent:true, opacity:0.32,
+    blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide });
+  for (const [dir, side] of [[ta,1],[ta,-1],[tb,1],[tb,-1]]){
+    const p = new THREE.Mesh(portalLightGeo, lightMat);
+    p.position.copy(base)
+      .addScaledVector(dir, side * HOLE_OPEN/2)
+      .addScaledVector(n, LIGHT_H/2);
+    const zAxis = dir.clone().multiplyScalar(side);
+    const xAxis = new THREE.Vector3().crossVectors(n, zAxis);
+    p.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(xAxis, n, zAxis));
+    levelGroup.add(p);
+  }
+  const light = new THREE.PointLight(col.getHex(), 0.45, 2.8, 2);
+  light.position.copy(base).addScaledVector(n, 0.5);
+  levelGroup.add(light);
+  portalFX.set(cellKey(fi,u,v), { lightMat, light, flare:0 });
+}
+
+function generatePortals(pairs){
+  const free = () => {
+    for (let t = 0; t < 60; t++){
+      const fi = (Math.random()*6)|0, u = (Math.random()*N)|0, v = (Math.random()*N)|0;
+      const k = cellKey(fi,u,v);
+      if (fi === 2 && u === 2 && v === 2) continue;
+      if (blocked.has(k) || holes.has(k) || bridged.has(k) || portals.has(k)
+          || oneways.has(k) || k === finishKey) continue;
+      return { fi, u, v, k };
+    }
+    return null;
+  };
+  for (let i = 0; i < pairs; i++){
+    const a = free(); if (!a) return;
+    portals.set(a.k, {});                        // reserve before drawing b
+    const b = free();
+    if (!b){ portals.delete(a.k); return; }
+    portals.set(a.k, { pair: b.k });
+    portals.set(b.k, { pair: a.k });
+    portalList.push([a.fi,a.u,a.v], [b.fi,b.u,b.v]);
+    const col = new THREE.Color(PORTAL_COLORS[i % PORTAL_COLORS.length]);
+    const note = [329.63, 392.00, 440.00, 523.25][i % 4];   // E4 G4 A4 C5
+    const wallMat = new THREE.MeshLambertMaterial({
+      color: col.clone().multiplyScalar(0.5), side: THREE.DoubleSide });
+    const floorMat = new THREE.MeshBasicMaterial({ color: col.clone().multiplyScalar(0.3) });
+    addPortalCell(a.fi, a.u, a.v, wallMat, floorMat, col);
+    addPortalCell(b.fi, b.u, b.v, wallMat, floorMat, col);
+    portalFX.get(a.k).note = note;
+    portalFX.get(b.k).note = note;
+  }
+}
+
+// ---------- gems ----------
+const gems = [];
+let gemCount = 0, gemsTotal = 0;
+const gemGeo = new THREE.OctahedronGeometry(CELL*0.22);
+const gemMat = new THREE.MeshLambertMaterial({ color:0xd9a63a, emissive:0x8a5f10, emissiveIntensity:0.5 });
+
+function spawnGems(count){
+  const taken = new Set([cellKey(2,2,2)]);
+  let made = 0, guard = 0;
+  while (made < count && guard++ < 800){
+    const fi = (Math.random()*6)|0;
+    const u = (Math.random()*N)|0, v = (Math.random()*N)|0;
+    const k = cellKey(fi,u,v);
+    if (taken.has(k) || holes.has(k) || portals.has(k) || !walkable(fi,u,v)) continue;
+    taken.add(k);
+    const pos = cellToPoint(fi, u, v);
+    const m = new THREE.Mesh(gemGeo, gemMat.clone());
+    m.castShadow = true;
+    m.position.copy(pos).addScaledVector(FACES[fi].n, CELL*0.35 + faceLift(fi));
+    m.quaternion.setFromUnitVectors(_upY, FACES[fi].n);
+    levelGroup.add(m);
+    gems.push({ face:fi, pos, mesh:m, taken:false, phase:Math.random()*6 });
+    made++;
+  }
+  return made;
+}
+
+function checkGem(){
+  const fi = faceIndexOf(Nf);
+  for (const g of gems){
+    if (!g.taken && g.face === fi && g.pos.distanceTo(P) < CELL*0.4){
+      g.taken = true;
+      levelGroup.remove(g.mesh);
+      gemCount++;
+      // ascending pentatonic — a collection run reads as a phrase, not repetition
+      const scale = [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26];
+      const semis = scale[Math.min(gemCount - 1, scale.length - 1)];
+      sfxBell(523.25 * Math.pow(2, semis/12), 0.7, 0.22);
+      for (const fk of Object.keys(FEATURES))
+        if (FEATURES[fk].on && FEATURES[fk].onGem) FEATURES[fk].onGem();
+      updateGemHUD();
+      if (gemCount >= gemsTotal){
+        if (featureOn('keystone') && keystoneCell) awakenKeystone();
+        else levelComplete();
+      }
+    }
+  }
+}
+
+// place the keystone: a low shrine dais on a walkable cell, as far from the
+// start as reachability allows, so reaching it is a genuine journey. Walkable
+// and reachable, so it never blocks solvability — it's a destination, not a wall.
+function placeKeystone(){
+  const dist = bfsFrom(2, 2, 2);              // steps from the start cell
+  let best = null, bestD = -1;
+  for (const [k, d] of dist){
+    const [fi, u, v] = k.split(',').map(Number);
+    if (fi === 2 && u === 2 && v === 2) continue;
+    if (holes.has(k) || portals.has(k)) continue;
+    // avoid sitting on a gem cell
+    let onGem = false;
+    for (const g of gems){ const gc = pointToCell(g.face, g.pos);
+      if (g.face === fi && gc.u === u && gc.v === v){ onGem = true; break; } }
+    if (onGem) continue;
+    if (d > bestD){ bestD = d; best = k; }
+  }
+  if (!best) return;
+  keystoneCell = best;
+  const [fi, u, v] = best.split(',').map(Number);
+  const n = FACES[fi].n;
+  const base = cellToPoint(fi, u, v);
+  const q = new THREE.Quaternion().setFromUnitVectors(_upY, n);
+  const g = new THREE.Group();
+  g.position.copy(base); g.quaternion.copy(q);
+  levelGroup.add(g);
+  keystoneGroup = g;
+  // a low two-tier dais with a small standing stone — reads as a shrine, but
+  // flat enough to stand on
+  const daisMat = new THREE.MeshLambertMaterial({ color:0xe0d0b8 });
+  const d1 = new THREE.Mesh(bevelledBox(CELL*0.9, CELL*0.12, CELL*0.9, bevelAmount()), daisMat);
+  d1.position.set(0, CELL*0.06, 0); d1.castShadow = true; d1.receiveShadow = true;
+  g.add(d1);
+  const d2 = new THREE.Mesh(bevelledBox(CELL*0.6, CELL*0.1, CELL*0.6, bevelAmount()), daisMat);
+  d2.position.set(0, CELL*0.17, 0); d2.castShadow = true; d2.receiveShadow = true;
+  g.add(d2);
+  // a small dormant marker stone in the centre — glows gently even while
+  // dormant so you can spot the shrine, then blazes when awake
+  const markMat = new THREE.MeshLambertMaterial({ color:0xb8a89a, emissive:0x4a3a2a });
+  const mark = new THREE.Mesh(new THREE.ConeGeometry(CELL*0.16, CELL*0.5, 5), markMat);
+  mark.position.set(0, CELL*0.47, 0); mark.rotation.y = Math.PI/5;
+  mark.castShadow = true;
+  g.add(mark);
+  keystoneGroup.userData.mark = mark;
+  // a faint dormant light column — thin and dim, a candle not a beacon — so the
+  // shrine reads as "something here" from across the surface before it wakes
+  const dormMat = new THREE.MeshBasicMaterial({
+    color:0xe8c890, transparent:true, opacity:0.18,
+    blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide });
+  const dormCol = new THREE.Mesh(
+    new THREE.CylinderGeometry(CELL*0.06, CELL*0.14, CELL*1.1, 5, 1, true), dormMat);
+  dormCol.position.set(0, CELL*0.9, 0);
+  g.add(dormCol);
+  keystoneGroup.userData.dormant = dormCol;
+}
+
+// ---------- push-block puzzle (PUZZLE objective) ----------
+// Sokoban on the cube surface: push blocks onto target pads. State lives in
+// pushBlocks (cellKey -> mesh); pads are target cells. You win when every block
+// sits on a pad. Pushing respects the movement graph, so blocks slide across
+// cube edges just as the player does.
+const pushBlocks = new Map();     // current cellKey -> { mesh }
+const pushPads = new Map();       // pad cellKey -> mesh
+let pushGroup = null;
+
+function clearPushPuzzle(){
+  pushBlocks.clear();
+  pushPads.clear();
+  pushGroup = null;
+}
+
+// find the cell you reach stepping from (fi,u,v) in world-direction D, using the
+// same edge-aware graph the player moves on. Returns [nf,nu,nv] or null.
+function cellStep(fi, u, v, D){
+  let bestC = null, bestDot = 0.9;
+  for (const [nf, nu, nv, , dir] of cellNeighbours(fi, u, v)){
+    const d = dir.dot(D);
+    if (d > bestDot){ bestDot = d; bestC = [nf, nu, nv]; }
+  }
+  return bestC;
+}
+
+function placePushPuzzle(){
+  clearPushPuzzle();
+  pushGroup = new THREE.Group();
+  levelGroup.add(pushGroup);
+  const count = Math.min(1 + (level >> 1), 4);   // 1-4 blocks
+
+  // SOLVABILITY: reverse-push to seed a likely-solvable layout, then VERIFY each
+  // block/pad pair with a real Sokoban state-search and retry on the rare
+  // unsolvable case. Reverse-push alone is ~88% solvable (the player can't
+  // always navigate to the pushing spot); the verify closes the gap to 100%.
+  const dist = bfsFrom(2, 2, 2);
+  const walkKeys = [...dist.keys()];
+  const usedPad = new Set(), usedBlock = new Set();
+  let placed = 0, guard = 0;
+  while (placed < count && guard++ < 200){
+    const padK = walkKeys[(Math.random()*walkKeys.length)|0];
+    if (padK === cellKey(2,2,2) || usedPad.has(padK) || usedBlock.has(padK)) continue;
+
+    // reverse-push the block away from the pad
+    let curK = padK;
+    const steps = 2 + (Math.random()*3|0);
+    for (let s = 0; s < steps; s++){
+      const [cf, cu, cv] = curK.split(',').map(Number);
+      const opts = cellNeighbours(cf, cu, cv).filter(([nf,nu,nv,mk,dir]) => {
+        const nk = cellKey(nf,nu,nv);
+        if (blocked.has(nk) || holes.has(nk) || usedBlock.has(nk) || usedPad.has(nk)
+            || nk === cellKey(2,2,2)) return false;
+        if (mk && rails.has(mk)) return false;    // don't seed a block across a wall
+        const behind = cellStep(nf, nu, nv, dir);
+        if (!behind) return false;
+        const behindK = cellKey(...behind);
+        return !blocked.has(behindK) && !holes.has(behindK);
+      });
+      if (!opts.length) break;
+      const [nf,nu,nv] = opts[(Math.random()*opts.length)|0];
+      curK = cellKey(nf,nu,nv);
+    }
+    if (curK === padK) continue;                  // didn't move off the pad
+
+    // per-block pre-filter: cheap rejection of a block that can't reach its pad
+    // even alone (treating already-placed blocks as fixed).
+    if (!pushSolvable(curK, padK, usedBlock)) continue;
+
+    usedPad.add(padK); usedBlock.add(curK);
+    placed++;
+  }
+
+  // JOINT solvability: the per-block filter misses cases where blocks wall each
+  // other in (the level-9 failures). Verify the whole set together, and if it's
+  // not solvable, drop blocks one at a time until it is — a smaller solvable
+  // puzzle beats an impossible one. Runs once (not per placement) to stay fast.
+  let blockList = [...usedBlock], padList = [...usedPad];
+  while (blockList.length > 0 && !puzzleJointSolvable(blockList, padList)){
+    blockList.pop(); padList.pop();               // drop the last-added pair
+  }
+
+  for (let i = 0; i < blockList.length; i++){
+    addPushPad(padList[i]);
+    addPushBlock(blockList[i]);
+  }
+  refreshPads();
+  updateGemHUD();
+  // guarantee at least one solvable block exists, or the puzzle is trivially won
+  if (pushBlocks.size === 0) placeReachGoal();    // fallback: a plain reach goal
+}
+
+// Multi-block JOINT solvability: can ALL blocks be pushed onto ALL pads, given
+// they interfere with each other? State = every block position + the player's
+// reachable region. This is the real test — the per-block check misses cases
+// where one block walls off the route needed to solve another.
+function puzzleJointSolvable(blockKeys, padKeys){
+  const startP = cellKey(2, 2, 2);
+  const playerReach = (fromK, occ) => {
+    const seen = new Set([fromK]), q = [fromK];
+    for (let h = 0; h < q.length; h++){
+      const [a,b,c] = q[h].split(',').map(Number);
+      for (const [nf,nu,nv] of neighborsOf(a,b,c)){
+        const k = cellKey(nf,nu,nv);
+        if (seen.has(k) || blocked.has(k) || holes.has(k) || occ.has(k)) continue;
+        seen.add(k); q.push(k);
+      }
+    }
+    return seen;
+  };
+  const solved = bs => padKeys.every(p => bs.includes(p));
+  const seen = new Set();
+  const queue = [{ bs: blockKeys.slice().sort(), p: startP }];
+  let iter = 0;
+  const CAP = 40000;                  // bounded state expansions
+  const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const BUDGET_MS = 250;              // never hitch generation for a single check
+  while (queue.length && iter++ < CAP){
+    if ((iter & 1023) === 0){
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      if (now - t0 > BUDGET_MS) return false;   // treat as unproven -> drop a block
+    }
+    const st = queue.shift();
+    if (solved(st.bs)) return true;
+    const occ = new Set(st.bs);
+    const reach = playerReach(st.p, occ);
+    const sig = st.bs.join(';') + '|' + [...reach].sort().join();
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    for (let i = 0; i < st.bs.length; i++){
+      const [bf, bu, bv] = st.bs[i].split(',').map(Number);
+      for (const [nf, nu, nv, mk, dir] of cellNeighbours(bf, bu, bv)){
+        const destK = cellKey(nf, nu, nv);
+        if (blocked.has(destK) || holes.has(destK) || occ.has(destK)) continue;
+        if (mk && rails.has(mk)) continue;
+        const behind = cellStep(bf, bu, bv, dir.clone().negate());
+        if (!behind) continue;
+        if (!reach.has(cellKey(...behind))) continue;
+        const nbs = st.bs.slice(); nbs[i] = destK; nbs.sort();
+        queue.push({ bs: nbs, p: st.bs[i] });
+      }
+    }
+  }
+  return false;                       // exhausted (or hit cap) without solving
+}
+
+// Sokoban single-block solvability: can the block at blockK be pushed to padK,
+// with the player starting at cell 0 and `fixed` cells (other blocks) immovable?
+function pushSolvable(blockK, padK, fixed){
+  const playerReach = (fromK, blockAt) => {
+    // BFS of cells the player can walk to, with blockAt + fixed impassable
+    const seen = new Set([fromK]);
+    const q = [fromK];
+    for (let h = 0; h < q.length; h++){
+      const [a,b,c] = q[h].split(',').map(Number);
+      for (const [nf,nu,nv] of neighborsOf(a,b,c)){
+        const k = cellKey(nf,nu,nv);
+        if (seen.has(k) || blocked.has(k) || holes.has(k)
+            || k === blockAt || fixed.has(k)) continue;
+        seen.add(k); q.push(k);
+      }
+    }
+    return seen;
+  };
+  const startP = cellKey(2,2,2);
+  const seenStates = new Set();
+  const queue = [{ b: blockK, p: startP }];
+  let iter = 0;
+  while (queue.length && iter++ < 4000){
+    const st = queue.shift();
+    if (st.b === padK) return true;
+    const reach = playerReach(st.p, st.b);
+    const sig = st.b + '|' + [...reach].sort().join();
+    if (seenStates.has(sig)) continue;
+    seenStates.add(sig);
+    const [bf, bu, bv] = st.b.split(',').map(Number);
+    // for each direction the block could be pushed
+    for (const [nf, nu, nv, mk, dir] of cellNeighbours(bf, bu, bv)){
+      const destK = cellKey(nf, nu, nv);
+      if (blocked.has(destK) || holes.has(destK) || fixed.has(destK)) continue;
+      if (mk && rails.has(mk)) continue;         // can't push a block through a wall
+      // player must stand on the opposite side to push
+      const behind = cellStep(bf, bu, bv, dir.clone().negate());
+      if (!behind) continue;
+      const behindK = cellKey(...behind);
+      if (!reach.has(behindK)) continue;
+      queue.push({ b: destK, p: st.b });         // player ends where block was
+    }
+  }
+  return false;
+}
+
+function addPushBlock(k){
+  const [fi, u, v] = k.split(',').map(Number);
+  const n = FACES[fi].n;
+  const base = cellToPoint(fi, u, v);
+  const geo = bevelledBox(BLOCK*0.82, BLOCK*0.82, BLOCK*0.82, bevelAmount()*1.4);
+  const mat = new THREE.MeshLambertMaterial({ color:0xc8794a });   // warm clay, stands out
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  mesh.position.copy(base).addScaledVector(n, CELL*0.41 + faceLift(fi));
+  mesh.quaternion.setFromUnitVectors(_upY, n);
+  mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat));
+  pushGroup.add(mesh);
+  pushBlocks.set(k, { mesh });
+}
+
+function addPushPad(k){
+  const [fi, u, v] = k.split(',').map(Number);
+  const n = FACES[fi].n;
+  const base = cellToPoint(fi, u, v);
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(CELL*0.24, CELL*0.38, 20),
+    new THREE.MeshBasicMaterial({ color:0xe0a03a, side:THREE.DoubleSide,
+      transparent:true, opacity:0.85 }));
+  ring.position.copy(base).addScaledVector(n, 0.02 + faceLift(fi));
+  ring.quaternion.setFromUnitVectors(_planeZ, n);
+  pushGroup.add(ring);
+  pushPads.set(k, ring);
+}
+
+// try to push the block at cell bk in world-direction D. Returns the new block
+// cell if it moved, else null. Called when the player steps into a block.
+// scratch vectors/quaternions for push-block animation
+const _pbTmp = new THREE.Vector3();
+const _pbQ = new THREE.Quaternion();
+const _pbTmp2 = new THREE.Vector3();
+const _pbQ2 = new THREE.Quaternion();
+function tryPush(bk, playerCellK, D){
+  try { return tryPushInner(bk, playerCellK, D); }
+  catch(err){ console.error('push error:', err); return null; }
+}
+function tryPushInner(bk, playerCellK, D){
+  const [bfi, bu, bv] = bk.split(',').map(Number);
+  // The push direction D is expressed in the PLAYER's face frame. When the block
+  // sits on a different face (across an edge), D isn't a valid tangent of the
+  // block's face, so we can't use it directly. Instead we pick the block's exit
+  // that continues the push line: the neighbour cell the player is shoving toward
+  // (furthest from the player along the shove line).
+  const playerPos = playerCellK ? cellToPoint(...playerCellK.split(',').map(Number)) : null;
+  let dest = null, destDir = null, destSeam = null;
+  if (playerPos){
+    const bPos = cellToPoint(bfi, bu, bv);
+    const shove = bPos.clone().sub(playerPos);   // world heading player->block
+    let best = -Infinity;
+    for (const [nf, nu, nv, mk, dir] of cellNeighbours(bfi, bu, bv)){
+      const nPos = cellToPoint(nf, nu, nv);
+      const away = nPos.clone().sub(playerPos).dot(shove);
+      const score = dir.dot(shove) + away * 0.001;
+      if (score > best){ best = score; dest = [nf, nu, nv]; destDir = dir.clone(); destSeam = mk; }
+    }
+  } else {
+    dest = cellStep(bfi, bu, bv, D);
+    if (dest){
+      for (const [nf, nu, nv, mk, dir] of cellNeighbours(bfi, bu, bv))
+        if (nf === dest[0] && nu === dest[1] && nv === dest[2]){ destDir = dir.clone(); destSeam = mk; break; }
+    }
+  }
+  if (!dest || !destDir) return null;            // block at edge with nowhere to go
+  const dk = cellKey(...dest);
+  // a wall (rail) on the seam blocks the block just as it blocks the player —
+  // the block can't be shoved through a wall it can't pass.
+  if (destSeam && rails.has(destSeam)) return null;
+  if (blocked.has(dk) || holes.has(dk) || pushBlocks.has(dk)) return null;
+  const rec = pushBlocks.get(bk);
+  if (rec.anim) return null;                      // already mid-push, ignore
+  const [nfi, nu, nv] = dest;
+  const sameFace = (nfi === bfi);
+  // the block's move direction on ITS OWN face, used for the flip axis
+  const bD = destDir;
+
+  // update the LOGICAL position immediately so chained pushes and the win check
+  // stay correct; the mesh catches up via the animation below.
+  pushBlocks.delete(bk);
+  pushBlocks.set(dk, rec);
+
+  const fromPos = rec.mesh.position.clone();
+  const fromQ = rec.mesh.quaternion.clone();
+  const nN = FACES[nfi].n;
+  const toPos = cellToPoint(nfi, nu, nv).addScaledVector(nN, CELL*0.41 + faceLift(nfi));
+  const toQ = new THREE.Quaternion().setFromUnitVectors(_upY, nN);
+
+  if (sameFace){
+    rec.anim = { kind:'slide', t:0, dur:150, fromPos, toPos };
+  } else {
+    const oldN = FACES[bfi].n;
+    let axis = new THREE.Vector3().crossVectors(oldN, bD);
+    if (axis.lengthSq() < 1e-9){
+      // degenerate — a zero axis becomes NaN and crashes WebGL. Fall back to slide.
+      rec.anim = { kind:'slide', t:0, dur:180, fromPos, toPos };
+      refreshPads(); updateGemHUD();
+      return dk;
+    }
+    axis.normalize();
+    const oldCentre = cellToPoint(bfi, bu, bv);
+    const edgeMid = oldCentre.clone()
+      .addScaledVector(bD, CELL/2)
+      .addScaledVector(oldN, -CELL/2);
+    const testEnd = (ang) => _pbTmp2.copy(fromPos).sub(edgeMid)
+      .applyQuaternion(_pbQ2.setFromAxisAngle(axis, ang)).add(edgeMid);
+    const half = Math.PI/2;
+    const dPos = testEnd(half).distanceTo(toPos);
+    const dNeg = testEnd(-half).distanceTo(toPos);
+    const sign = dPos <= dNeg ? 1 : -1;
+    const outN = oldN.clone().add(nN).normalize();    // bulge out over the edge
+    rec.anim = { kind:'flip', t:0, dur:220, fromPos, fromQ, toPos, toQ, axis, edgeMid, sign, outN };
+  }
+
+  refreshPads();
+  updateGemHUD();
+  return dk;
+}
+
+// advance push-block animations; called each frame
+function tickPushBlocks(dt){
+  try {
+  for (const rec of pushBlocks.values()){
+    const a = rec.anim;
+    if (!a) continue;
+    a.t += dt;
+    const raw = Math.min(1, a.t / a.dur);
+    const e = raw < 0.5 ? 2*raw*raw : 1 - Math.pow(-2*raw+2, 2)/2;   // ease in-out
+    if (a.kind === 'slide'){
+      rec.mesh.position.lerpVectors(a.fromPos, a.toPos, e);
+    } else {
+      // tumble over the edge: interpolate position along an arc that bulges out
+      // past the edge (so it swings over, not through the cube), while rotating
+      // 90° for the roll. Exact landing is snapped at raw>=1, so the arc only
+      // needs to read as a believable tumble.
+      _pbTmp.lerpVectors(a.fromPos, a.toPos, e);
+      // lift the midpoint outward along the average of the two face normals
+      const bulge = Math.sin(e * Math.PI) * CELL * 0.33;
+      _pbTmp.addScaledVector(a.outN, bulge);
+      rec.mesh.position.copy(_pbTmp);
+      _pbQ.setFromAxisAngle(a.axis, e * (Math.PI/2) * a.sign);
+      rec.mesh.quaternion.copy(_pbQ).multiply(a.fromQ);
+    }
+    // NaN guard: a non-finite position/quaternion crashes the WebGL renderer
+    const _p = rec.mesh.position;
+    if (!Number.isFinite(_p.x) || !Number.isFinite(_p.y) || !Number.isFinite(_p.z)){
+      rec.mesh.position.copy(a.toPos);
+      if (a.toQ) rec.mesh.quaternion.copy(a.toQ);
+      rec.anim = null;
+      continue;
+    }
+    if (raw >= 1){
+      rec.mesh.position.copy(a.toPos);
+      if (a.toQ) rec.mesh.quaternion.copy(a.toQ);   // flips reorient; slides don't
+      rec.anim = null;
+      refreshPads();
+      if (puzzleSolved()) levelComplete();
+    }
+  }
+  } catch(err){
+    console.error('push animation error:', err);
+    // never let an animation glitch spam or crash: snap all to their targets
+    for (const rec of pushBlocks.values()) if (rec.anim){
+      rec.mesh.position.copy(rec.anim.toPos);
+      if (rec.anim.toQ) rec.mesh.quaternion.copy(rec.anim.toQ);
+      rec.anim = null;
+    }
+  }
+}
+
+// light up pads that have a block on them
+function refreshPads(){
+  for (const [pk, ring] of pushPads){
+    const on = pushBlocks.has(pk);
+    ring.material.color.setHex(on ? 0x66c7a5 : 0xe0a03a);
+    ring.material.opacity = on ? 1.0 : 0.85;
+  }
+}
+
+function puzzleSolved(){
+  for (const pk of pushPads.keys()) if (!pushBlocks.has(pk)) return false;
+  return pushPads.size > 0;
+}
+
+// ---------- keystone: the awakened monument that ends the level ----------
+// When KEYSTONE is on, collecting every gem doesn't finish the level — instead
+// it awakens one monument, and the player must journey to it and dwell there.
+// The monument is an ordinary reachable cell (solvability already guarantees a
+// path to it), so this composes without touching the movement graph.
+let keystoneCell = null;     // "fi,u,v" of the chosen monument
+let keystoneGroup = null;    // its mesh group, for the awaken glow
+let keystoneAwake = false;
+let keystoneCharge = 0;      // dwell progress 0..1
+let keystoneBeacon = null;   // the light column shown when awake
+const KEYSTONE_DWELL = 500;
+
+function awakenKeystone(){
+  if (keystoneAwake || !keystoneCell) return;
+  keystoneAwake = true;
+  const [fi, u, v] = keystoneCell.split(',').map(Number);
+  const n = FACES[fi].n;
+  const base = cellToPoint(fi, u, v);
+  // a rising column of warm light so it calls to you across the surface
+  const col = new THREE.Color(0xffd98a);
+  const geo = new THREE.CylinderGeometry(CELL*0.18, CELL*0.42, CELL*3.2, 5, 1, true);
+  const mat = new THREE.MeshBasicMaterial({
+    color: col, transparent:true, opacity:0.0,
+    blending:THREE.AdditiveBlending, depthWrite:false, side:THREE.DoubleSide });
+  keystoneBeacon = new THREE.Mesh(geo, mat);
+  keystoneBeacon.position.copy(base).addScaledVector(n, CELL*1.6);
+  keystoneBeacon.quaternion.setFromUnitVectors(_upY, n);
+  levelGroup.add(keystoneBeacon);
+  const light = new THREE.PointLight(0xffd98a, 0, 4, 2);
+  light.position.copy(base).addScaledVector(n, CELL*0.8);
+  levelGroup.add(light);
+  keystoneBeacon.userData.light = light;
+  if (keystoneGroup && keystoneGroup.userData.mark){
+    keystoneGroup.userData.mark.material.emissive.setHex(0xffb060);
+  }
+  if (keystoneGroup && keystoneGroup.userData.dormant){
+    keystoneGroup.userData.dormant.visible = false;   // bright beacon takes over
+  }
+  sfxBell(392, 1.4, 0.2);                     // a low chime: the way is open
+  setTimeout(() => sfxBell(587.33, 1.6, 0.2), 140);
+  updateGemHUD();
+  drawTrail();
+}
+
+function tickKeystone(dt){
+  // gently breathe the dormant shrine so it's spottable before it wakes
+  if (keystoneGroup && !keystoneAwake && keystoneGroup.userData.dormant){
+    const t = performance.now() * 0.001;
+    keystoneGroup.userData.dormant.material.opacity = 0.12 + 0.10*Math.sin(t*1.5);
+    keystoneGroup.userData.dormant.rotation.y += 0.005;
+  }
+  if (!keystoneBeacon) return;
+  const t = performance.now() * 0.001;
+  const pulse = 0.6 + 0.4*Math.sin(t*2);
+  const on = 0.35 + keystoneCharge * 0.5;
+  keystoneBeacon.material.opacity = on * pulse;
+  keystoneBeacon.userData.light.intensity = (0.6 + keystoneCharge*1.5) * pulse;
+  keystoneBeacon.rotation.y += 0.01;
+  // are we standing on the keystone?
+  if (state === 'idle' && phase === 'play'){
+    const fi = faceIndexOf(Nf);
+    const c = pointToCell(fi, P);
+    if (cellKey(fi, c.u, c.v) === keystoneCell){
+      keystoneCharge = Math.min(1, keystoneCharge + dt/KEYSTONE_DWELL);
+      if (keystoneCharge >= 1) levelComplete();
+    } else {
+      keystoneCharge = Math.max(0, keystoneCharge - dt/250);
+    }
+  }
+}
+
+// ---------- GAUNTLET: path-first gated puzzle generation ----------
+// Instead of filling randomly then checking solvability, we DESIGN the solution
+// first: carve one winding critical path from start to goal, then hang the
+// mechanics (one-way runs, mandatory portal bridges, tunnels) ONTO that path so
+// they're load-bearing — the route only works if you use them. Everything off
+// the path is walled into dead-ends and escapable traps to hide the route.
+
+// geometric neighbours of a cell: [nf, nu, nv, seamKey, dir] for each of 4 sides
+function cellNeighbours(fi, u, v){
+  const out = [];
+  const n = FACES[fi].n, [ta, tb] = basisOf(n);
+  const P0 = cellToPoint(fi, u, v);
+  const tmp = new THREE.Vector3();
+  for (const base of [ta, tb]) for (const s of [1, -1]){
+    const d = base.clone().multiplyScalar(s);
+    const mk = railKey(tmp.copy(P0).addScaledVector(d, CELL/2));
+    const cand = P0.clone().addScaledVector(d, CELL);
+    const inside =
+      Math.abs(cand.dot(ta)) <= H - CELL/2 + 1e-4 &&
+      Math.abs(cand.dot(tb)) <= H - CELL/2 + 1e-4;
+    let nf, cc;
+    if (inside){ nf = fi; cc = pointToCell(fi, cand); }
+    else {
+      const toP = P0.clone().addScaledVector(d, CELL/2).addScaledVector(n, -CELL/2);
+      nf = faceIndexOf(d); cc = pointToCell(nf, toP);
+    }
+    out.push([nf, cc.u, cc.v, mk, d.clone()]);
+  }
+  return out;
+}
+
+function generateGauntlet(){
+  const startCell = [2, 2, 2];
+  const startK = cellKey(...startCell);
+  // ---- Phase 1: carve the spine as a SELF-AVOIDING WALK WITH SPACING ----
+  // The corridor may never touch itself: each new cell's other neighbours must
+  // be off-path. That keeps every fold separated by stone, so the route reads
+  // as thin winding corridors, not open plazas (the bug behind empty regions —
+  // a plain DFS path folds onto itself and merges into wide open areas, and its
+  // endpoint can sit right beside the start despite being 'deep').
+  const targetLen = Math.min(18 + (level >> 1), 30);
+  let best = null;
+  for (let attempt = 0; attempt < 14; attempt++){
+    const path = [startCell];
+    const onPath = new Set([startK]);
+    let guard = 0;
+    while (path.length < targetLen && guard++ < 400){
+      const cur = path[path.length - 1];
+      const curK = cellKey(...cur);
+      const opts = cellNeighbours(...cur).filter(([nf, nu, nv]) => {
+        const ck = cellKey(nf, nu, nv);
+        if (onPath.has(ck)) return false;
+        // spacing rule: the candidate may touch the path ONLY at the current cell
+        for (const [mf, mu, mv] of cellNeighbours(nf, nu, nv)){
+          const mk = cellKey(mf, mu, mv);
+          if (mk !== curK && onPath.has(mk)) return false;
+        }
+        return true;
+      });
+      if (!opts.length) break;                 // dead-ended; this attempt is done
+      const [nf, nu, nv] = opts[(Math.random()*opts.length)|0];
+      path.push([nf, nu, nv]);
+      onPath.add(cellKey(nf, nu, nv));
+    }
+    // prefer walks that are long AND end on a different face (spatially far)
+    const endFace = path[path.length - 1][0];
+    const score = path.length + (endFace !== startCell[0] ? 12 : 0);
+    if (!best || score > best.score) best = { path, score };
+    if (best.path.length >= targetLen && best.path[best.path.length-1][0] !== startCell[0]) break;
+  }
+  const path = best.path;
+  const goalCell = path[path.length - 1];
+  // spine segments {from, cell, dir} for the gating pass
+  const spine = [];
+  for (let i = 1; i < path.length; i++){
+    const from = cellKey(...path[i-1]), cell = cellKey(...path[i]);
+    spine.push({ from, cell, dir: dirBetween(from, cell) });
+  }
+  gauntletSpine = new Set(path.map(c => cellKey(...c)));
+
+  // ---- Phase 2: the OPEN set — spine plus decoy corridors — stays walkable;
+  // every other cell becomes a masonry stack, so the path winds through solid
+  // stone rather than between thin walls. Same material world as Classic.
+  const open = new Set(gauntletSpine);
+
+  // decoy corridors: short dead-end branches off the spine, carved as open cells
+  // into the stone so the true route isn't obvious. A few become one-way traps.
+  const decoyMouths = [];                       // {cell, dir} for trap one-ways
+  const branchCount = Math.min(8 + (level >> 2), 14);   // capped: keep ~75% stone
+  let made = 0, guard = 0;
+  while (made < branchCount && guard++ < 300){
+    const anchor = spine[(Math.random()*spine.length)|0].cell;
+    let cur = anchor.split(',').map(Number);
+    let curK = anchor;
+    const len = 1 + (Math.random()*3|0);
+    const branch = [];
+    for (let step = 0; step < len; step++){
+      const opts = cellNeighbours(...cur).filter(([nf,nu,nv]) => {
+        const ck = cellKey(nf,nu,nv);
+        if (open.has(ck) || branch.includes(ck)) return false;
+        // spacing: the branch cell may touch open cells ONLY at its parent, so
+        // decoys stay thin corridors and never merge into plazas
+        for (const [mf,mu,mv] of cellNeighbours(nf,nu,nv)){
+          const mk = cellKey(mf,mu,mv);
+          if (mk !== curK && (open.has(mk) || branch.includes(mk))) return false;
+        }
+        return true;
+      });
+      if (!opts.length) break;
+      const [nf,nu,nv] = opts[(Math.random()*opts.length)|0];
+      const ck = cellKey(nf,nu,nv);
+      open.add(ck); branch.push(ck);
+      cur = [nf,nu,nv]; curK = ck;
+    }
+    if (branch.length){
+      made++;
+      // occasionally a commit-in trap: the one-way sits on the branch's FIRST
+      // cell pointing deeper, so entering commits you (respawn to escape) —
+      // never on the spine anchor, which would sever the main route itself
+      if (branch.length >= 2 && Math.random() < 0.3){
+        const d = dirBetween(branch[0], branch[1]);
+        if (d) decoyMouths.push({ cell: branch[0], dir: d });
+      }
+    }
+  }
+
+  // ---- Phase 2b: gate the spine with one-way runs — only if the ONE-WAY TILES
+  // feature is switched on in the lab. Off => a pure masonry-block maze.
+  if (featureOn('oneways')){
+    gateSpine(spine, startCell, goalCell);
+    for (const { cell, dir } of decoyMouths){
+      if (!oneways.has(cell)) oneways.set(cell, dir);
+    }
+  }
+
+  // ---- Phase 3: stack every non-open cell as masonry ----
+  const mode = MODE();
+  for (let fi = 0; fi < 6; fi++)
+    for (let u = 0; u < N; u++)
+      for (let v = 0; v < N; v++){
+        const ck = cellKey(fi, u, v);
+        if (open.has(ck)) continue;
+        // vary heights a little for a ruined skyline; 1-2 high
+        const h = 1 + (cellHash(fi, u, v, 71) < 0.35 ? 1 : 0);
+        addStack(fi, u, v, h, false);
+      }
+
+  // set the goal BEFORE the feature pass so every generator knows to avoid it
+  finishKey = cellKey(...goalCell);
+
+  // ---- Phase 4: weave the lab's obstacle features into the corridors ----
+  // Each generator already skips blocked cells and carries a connectivity
+  // guard, so here they confine themselves to the open corridors and can only
+  // decorate the maze, never sever it. The goal cell is explicitly protected.
+  // Portals are confined to the DECOY branches: in the movement graph a portal
+  // cell inherits its partner's exits, so one sitting mid-spine would muddy the
+  // route's reachability — off-spine they're shortcuts between false corridors.
+  for (const fk of ['towers', 'rails', 'holes', 'bridges'])
+    if (featureOn(fk) && FEATURES[fk].gen) FEATURES[fk].gen();
+  if (featureOn('portals') && FEATURES.portals.gen){
+    for (const s of gauntletSpine) blocked.add(s);    // shield the spine
+    FEATURES.portals.gen();
+    for (const s of gauntletSpine) blocked.delete(s);
+  }
+
+  placeGauntletGoal(goalCell);
+  // self-check: confirm the goal is directed-reachable from the start. The
+  // corridor is defined by open cells (stacks seal the rest), so the only thing
+  // that can strand the goal is an unlucky one-way; clearing them restores the
+  // fully-traversable spine. Proven not to trigger in simulation, but kept as a
+  // guarantee against any edge case.
+  if (!goalReachable()){
+    oneways.clear();
+    onewayMeshes.length = 0;
+  }
+}
+
+// is the finish reachable from the start through the current directed graph?
+function goalReachable(){
+  if (!finishKey) return true;
+  const seen = new Set([cellKey(2,2,2)]);
+  const q = [[2,2,2]];
+  for (let h = 0; h < q.length; h++){
+    const [a,b,c] = q[h];
+    if (cellKey(a,b,c) === finishKey) return true;
+    for (const [nf,nu,nv] of neighborsOf(a,b,c)){
+      const k = cellKey(nf,nu,nv);
+      if (seen.has(k) || blocked.has(k) || holes.has(k)) continue;
+      seen.add(k); q.push([nf,nu,nv]);
+    }
+  }
+  return seen.has(finishKey);
+}
+
+// hang mechanics on the spine so traversal REQUIRES them. Safe by construction:
+// one-ways point along the path (never blocking the intended direction), and
+// portals bridge gaps we simultaneously wall off, so they're the only crossing.
+function gateSpine(spine, startCell, goalCell){
+  const L = spine.length;
+  if (L < 6) return;                          // too short to gate meaningfully
+
+  // ONE-WAY RUNS: a few short committed stretches — accents on the route, not
+  // wallpaper. Runs point along the path (toward the goal), always solvable.
+  const runs = 2 + (level >> 2);              // 2-4 runs typically
+  let guard = 0;
+  for (let r = 0; r < runs && guard < 60; r++){
+    guard++;
+    const runLen = 2 + (Math.random()*2|0);   // 2-3 cells each
+    const startI = 1 + (Math.random() * Math.max(1, L - runLen - 2) | 0);
+    for (let i = startI; i < startI + runLen && i < L; i++){
+      const seg = spine[i];
+      if (seg && !oneways.has(seg.from)){
+        oneways.set(seg.from, seg.dir.clone());
+      }
+    }
+  }
+
+  // PORTAL BRIDGES: deferred pending correct gap-crossing generation.
+}
+
+// world-direction from cell A to adjacent cell B (or null if not adjacent)
+function dirBetween(aKey, bKey){
+  const [afi, au, av] = aKey.split(',').map(Number);
+  for (const [nf, nu, nv, , dir] of cellNeighbours(afi, au, av)){
+    if (cellKey(nf, nu, nv) === bKey) return dir.clone();
+  }
+  return null;
+}
+
+function placeGauntletGoal(goalCell){
+  const [fi, u, v] = goalCell;
+  const pos = cellToPoint(fi, u, v);
+  const tile = new THREE.Mesh(new THREE.PlaneGeometry(CELL*0.8, CELL*0.8),
+    new THREE.MeshBasicMaterial({ color:0x66c7a5 }));
+  tile.position.copy(pos).addScaledVector(FACES[fi].n, 0.015);
+  tile.quaternion.setFromUnitVectors(_planeZ, FACES[fi].n);
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(CELL*0.18, CELL*0.5, 4),
+    new THREE.MeshLambertMaterial({ color:0x66c7a5, emissive:0x1f5f49, emissiveIntensity:0.6 }));
+  cone.position.copy(pos).addScaledVector(FACES[fi].n, CELL*0.3);
+  cone.quaternion.setFromUnitVectors(_upY, FACES[fi].n);
+  levelGroup.add(tile, cone);
+}
+
+// ---------- maze mode: one perfect maze over the whole surface ----------
+// Start with every seam walled (cube edges included), then carve a randomized
+// depth-first spanning tree over all 216 cells. Result: every cell reachable,
+// exactly one route between any two — the strongest solvability guarantee
+// there is. Remaining walls become rails.
+let finishKey = null;
+
+function generateMaze(){
+  const dirs = ['+u','-u','+v','-v'];
+  const tmp = new THREE.Vector3();
+  // enumerate every seam, keyed by midpoint (shared seams collapse, even
+  // across cube edges) with one representative (face, cell, dir) for the mesh
+  const wall = new Map();
+  for (let fi = 0; fi < 6; fi++){
+    const [ta, tb] = basisOf(FACES[fi].n);
+    for (let u = 0; u < N; u++) for (let v = 0; v < N; v++){
+      const c = cellToPoint(fi, u, v);
+      for (const d of dirs){
+        const ax = (d[1]==='u' ? ta : tb).clone().multiplyScalar(d[0]==='+' ? 1 : -1);
+        const mk = railKey(tmp.copy(c).addScaledVector(ax, CELL/2));
+        if (!wall.has(mk)) wall.set(mk, [fi, u, v, d]);
+      }
+    }
+  }
+  // randomized DFS carve from the start cell
+  const visited = new Set([cellKey(2,2,2)]);
+  const stack = [[2,2,2]];
+  while (stack.length){
+    const [fi, u, v] = stack[stack.length - 1];
+    const n = FACES[fi].n, [ta, tb] = basisOf(n);
+    const P0 = cellToPoint(fi, u, v);
+    const opts = [];
+    for (const base of [ta, tb]) for (const s of [1, -1]){
+      const d = base.clone().multiplyScalar(s);
+      const mk = railKey(tmp.copy(P0).addScaledVector(d, CELL/2));
+      const cand = P0.clone().addScaledVector(d, CELL);
+      const inside =
+        Math.abs(cand.dot(ta)) <= H - CELL/2 + 1e-4 &&
+        Math.abs(cand.dot(tb)) <= H - CELL/2 + 1e-4;
+      let nf, cc;
+      if (inside){ nf = fi; cc = pointToCell(fi, cand); }
+      else {
+        const toP = P0.clone().addScaledVector(d, CELL/2).addScaledVector(n, -CELL/2);
+        nf = faceIndexOf(d); cc = pointToCell(nf, toP);
+      }
+      if (!visited.has(cellKey(nf, cc.u, cc.v))) opts.push([nf, cc.u, cc.v, mk]);
+    }
+    if (!opts.length){ stack.pop(); continue; }
+    const [nf, nu, nv, mk] = opts[(Math.random()*opts.length)|0];
+    wall.delete(mk);                                   // carve the passage
+    visited.add(cellKey(nf, nu, nv));
+    stack.push([nf, nu, nv]);
+  }
+  // register every wall key first, THEN build meshes — the end-context checks
+  // (mitre vs flat) need to see the complete layout
+  for (const mk of wall.keys()) rails.add(mk);
+  for (const [, [fi, u, v, d]] of wall) addRail(fi, u, v, d);
+}
+
+// the finish sits at the farthest cell from the start along the maze
+function placeReachGoal(){
+  const dist = bfsFrom(2, 2, 2);
+  let bk = null, bd = -1;
+  for (const [k, d] of dist) if (d > bd){ bd = d; bk = k; }
+  finishKey = bk;
+  const [fi, u, v] = bk.split(',').map(Number);
+  const pos = cellToPoint(fi, u, v);
+  const tile = new THREE.Mesh(new THREE.PlaneGeometry(CELL*0.8, CELL*0.8),
+    new THREE.MeshBasicMaterial({ color:0x66c7a5 }));
+  tile.position.copy(pos).addScaledVector(FACES[fi].n, 0.015);
+  tile.quaternion.setFromUnitVectors(_planeZ, FACES[fi].n);
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(CELL*0.18, CELL*0.5, 4),
+    new THREE.MeshLambertMaterial({ color:0x66c7a5, emissive:0x1f5f49, emissiveIntensity:0.6 }));
+  cone.position.copy(pos).addScaledVector(FACES[fi].n, CELL*0.3);
+  cone.quaternion.setFromUnitVectors(_upY, FACES[fi].n);
+  levelGroup.add(tile, cone);
+}
+
+// ---------- see through: fade whatever hides the player ----------
+// A raycast from the camera to the player each frame. Anything it hits on the
+// way fades out; everything else fades back. Works for any obstacle type —
+// towers, tunnels, wall fins — without special-casing them.
+const occRay = new THREE.Raycaster();
+const occFaded = new Map();      // mesh -> { mat, target }
+const _occFrom = new THREE.Vector3(), _occTo = new THREE.Vector3(), _occDir = new THREE.Vector3();
+const _occUp = new THREE.Vector3(0, 1, 0);
+
+function updateSeeThrough(dt){
+  const on = featureOn('seeThrough');
+  const hitNow = new Set();
+  if (on && levelGroup && phase === 'play'){
+    _occTo.copy(player.position);
+    world.localToWorld(_occTo);                       // player is a child of world
+    // orthographic view: cast from a point offset back along the view direction
+    _occDir.copy(camera.position).normalize();
+    const back = _occDir.clone().negate();
+    // a spread of rays across the player's silhouette, so a block clipping its
+    // edge fades too rather than only dead-centre hits
+    const rx = new THREE.Vector3().crossVectors(_occDir, _occUp).normalize();
+    const ry = new THREE.Vector3().crossVectors(rx, _occDir).normalize();
+    const r = PSIZE * 0.5;
+    const offs = [[0,0], [r,0], [-r,0], [0,r], [0,-r]];
+    for (const [ox, oy] of offs){
+      _occFrom.copy(_occTo).addScaledVector(rx, ox).addScaledVector(ry, oy)
+              .addScaledVector(_occDir, 60);
+      occRay.set(_occFrom, back);
+      occRay.far = 60 - 0.6;                          // stop just short of the player
+      const hits = occRay.intersectObjects(levelGroup.children, false);
+      for (const h of hits){
+        const m = h.object;
+        if (!m.isMesh || !m.material) continue;
+        // only solid obstacles: skip additive glow planes and anything already transparent
+        if (m.material.blending === THREE.AdditiveBlending) continue;
+        if (m.material.transparent && !occFaded.has(m)) continue;
+        hitNow.add(m);
+        if (!occFaded.has(m)){
+          // materials are shared between meshes — clone so only this one fades
+          const mat = m.material.clone();
+          mat.transparent = true;
+          m.userData._origMat = m.material;
+          m.material = mat;
+          occFaded.set(m, { mat, target: 0 });
+        }
+        occFaded.get(m).target = 1;
+      }
+    }
+  }
+  // ease every tracked mesh toward its target, restoring finished ones
+  const fade = FEATURES.seeThrough.slider.value / 100;
+  const k = 1 - Math.exp(-9 * dt / 1000);
+  for (const [m, rec] of occFaded){
+    if (!hitNow.has(m)) rec.target = 0;
+    const want = rec.target ? fade : 1;
+    rec.mat.opacity += (want - rec.mat.opacity) * k;
+    if (rec.target === 0 && rec.mat.opacity > 0.995){
+      // fully restored — hand the shared material back and drop the clone
+      if (m.userData._origMat) m.material = m.userData._origMat;
+      rec.mat.dispose();
+      occFaded.delete(m);
+    }
+  }
+}
+function clearSeeThrough(){
+  for (const [m, rec] of occFaded){
+    if (m.userData._origMat) m.material = m.userData._origMat;
+    rec.mat.dispose();
+  }
+  occFaded.clear();
+}
+
+// ---------- solution trail: the route, drawn as breadcrumbs ----------
+// The pathfinding already exists (the clock is sized from it) — this just
+// renders it. BFS with parent links so a route can be walked back.
+function bfsPaths(fi, u, v){
+  const start = cellKey(fi,u,v);
+  const dist = new Map([[start, 0]]);
+  const prev = new Map();
+  const q = [[fi,u,v]];
+  for (let h = 0; h < q.length; h++){
+    const [a,b,c] = q[h];
+    const kFrom = cellKey(a,b,c);
+    for (const [nf,nu,nv] of neighborsOf(a,b,c)){
+      const k = cellKey(nf,nu,nv);
+      if (dist.has(k) || blocked.has(k) || holes.has(k)) continue;
+      dist.set(k, dist.get(kFrom) + 1);
+      prev.set(k, kFrom);
+      q.push([nf,nu,nv]);
+    }
+  }
+  return { dist, prev };
+}
+function tracePath(prev, target){
+  const out = [];
+  let k = target;
+  while (k !== undefined){ out.push(k); k = prev.get(k); }
+  return out.reverse();
+}
+
+// the route from where the player stands: the exit in maze mode, otherwise a
+// greedy tour through whatever gems remain
+function computeRoute(){
+  const fi = faceIndexOf(Nf);
+  const c = pointToCell(fi, P);
+  let cur = [fi, c.u, c.v];
+  const route = [];
+  // keystone awake: the goal is the keystone, not the gems (they're all gone)
+  if (keystoneAwake && keystoneCell){
+    const { prev } = bfsPaths(cur[0], cur[1], cur[2]);
+    return tracePath(prev, keystoneCell);
+  }
+  if (isGoalObjective()){
+    if (!finishKey) return route;
+    const { prev } = bfsPaths(cur[0], cur[1], cur[2]);
+    return tracePath(prev, finishKey);
+  }
+  const left = gems.filter(g => !g.taken);
+  let guard = 0;
+  while (left.length && guard++ < 40){
+    const { dist, prev } = bfsPaths(cur[0], cur[1], cur[2]);
+    let bi = -1, bd = Infinity;
+    for (let i = 0; i < left.length; i++){
+      const gc = pointToCell(left[i].face, left[i].pos);
+      const d = dist.get(cellKey(left[i].face, gc.u, gc.v));
+      if (d !== undefined && d < bd){ bd = d; bi = i; }
+    }
+    if (bi < 0) break;
+    const g = left.splice(bi, 1)[0];
+    const gc = pointToCell(g.face, g.pos);
+    const leg = tracePath(prev, cellKey(g.face, gc.u, gc.v));
+    route.push(...(route.length ? leg.slice(1) : leg));
+    cur = [g.face, gc.u, gc.v];
+  }
+  return route;
+}
+
+const trailGroup = new THREE.Group();
+world.add(trailGroup);
+const dotGeo = new THREE.SphereGeometry(CELL*0.09, 10, 8);
+const dots = [];
+function clearTrail(){
+  for (const d of dots) trailGroup.remove(d.mesh);
+  dots.length = 0;
+}
+function drawTrail(){
+  clearTrail();
+  if (!featureOn('solution') || phase !== 'play') return;
+  const route = computeRoute();
+  route.forEach((k, i) => {
+    if (i === 0) return;                       // skip the cell we're standing on
+    const [fi, u, v] = k.split(',').map(Number);
+    // a portal on the route is a deliberate hop, not a walk-through — mark it
+    const isPortal = portals.has(k);
+    const mesh = new THREE.Mesh(dotGeo, new THREE.MeshBasicMaterial({
+      color: isPortal ? 0xffffff : 0x5c4a5e, transparent:true, opacity:0.5 }));
+    mesh.position.copy(cellToPoint(fi, u, v))
+      .addScaledVector(FACES[fi].n, CELL*0.22 + faceLift(fi));
+    if (isPortal) mesh.scale.setScalar(1.6);
+    trailGroup.add(mesh);
+    dots.push({ mesh, i, base: isPortal ? 1.6 : 1 });
+  });
+}
+
+// ---------- fairness: measure the level, derive the clock ----------
+// BFS step-distances over the real walkable graph (rails sever seams,
+// holes are impassable for routing — falling in is not a route).
+function bfsFrom(fi, u, v){
+  const dist = new Map([[cellKey(fi,u,v), 0]]);
+  const q = [[fi,u,v]];
+  for (let h = 0; h < q.length; h++){
+    const [a,b,c] = q[h];
+    const d0 = dist.get(cellKey(a,b,c));
+    for (const [nf,nu,nv] of neighborsOf(a,b,c)){
+      const k = cellKey(nf,nu,nv);
+      if (dist.has(k) || blocked.has(k) || holes.has(k)) continue;
+      dist.set(k, d0 + 1);
+      q.push([nf,nu,nv]);
+    }
+  }
+  return dist;
+}
+
+// failsafe: if a gem is somehow unreachable, move it to a reachable cell
+function relocateGem(g, dist){
+  const keys = [...dist.keys()].filter(k => k !== cellKey(2,2,2));
+  const k = keys[(Math.random()*keys.length)|0];
+  const [fi,u,v] = k.split(',').map(Number);
+  g.face = fi;
+  g.pos = cellToPoint(fi, u, v);
+  g.mesh.quaternion.setFromUnitVectors(_upY, FACES[fi].n);
+}
+
+// greedy nearest-neighbour tour through all gems: a solid upper-ish bound on
+// the walking the level actually demands
+function shortestTour(){
+  let cur = [2,2,2];
+  const remaining = gems.slice();
+  let steps = 0, guard = 0;
+  while (remaining.length && guard++ < 40){
+    const dist = bfsFrom(cur[0], cur[1], cur[2]);
+    let bi = -1, bd = Infinity;
+    for (let i = 0; i < remaining.length; i++){
+      const c = pointToCell(remaining[i].face, remaining[i].pos);
+      const d = dist.get(cellKey(remaining[i].face, c.u, c.v));
+      if (d !== undefined && d < bd){ bd = d; bi = i; }
+    }
+    if (bi < 0){ relocateGem(remaining[0], dist); continue; }
+    steps += bd;
+    const g = remaining.splice(bi, 1)[0];
+    const c = pointToCell(g.face, g.pos);
+    cur = [g.face, c.u, c.v];
+  }
+  return steps;
+}
+
+// the clock is derived from the measured tour: always beatable, with a slack
+// margin that tightens as levels climb — difficulty without impossibility
+function fairTimeLimit(){
+  let steps;
+  if (isGoalObjective() && finishKey){
+    steps = bfsFrom(2,2,2).get(finishKey) || 80;       // the one true path
+  } else {
+    steps = shortestTour();
+  }
+  const perStep = 0.42;                              // seconds per step, decent pace
+  const slack = Math.max(1.15, 1.8 - level * 0.07);
+  return Math.max(20, Math.ceil(steps * perStep * slack) + 6);
+}
+
+// ---------- HUD ----------
+const faceDot = document.getElementById('faceDot');
+const faceName = document.getElementById('faceName');
+const gemHud = document.getElementById('gems');
+const levelChip = document.getElementById('levelChip');
+const timeChip = document.getElementById('timeChip');
+function updateFaceHUD(){
+  const f = FACES[faceIndexOf(Nf)];
+  faceName.textContent = f.name;
+  faceDot.style.background = f.color;
+}
+function updateGemHUD(){
+  if (MODE().objective === 'puzzle'){
+    const on = [...pushPads.keys()].filter(k => pushBlocks.has(k)).length;
+    gemHud.innerHTML = '&#9632; ' + on + ' / ' + pushPads.size + ' ON PADS';
+    return;
+  }
+  if (isGoalObjective()){ gemHud.innerHTML = 'REACH THE GOAL'; return; }
+  if (keystoneAwake){ gemHud.innerHTML = '&#9650; REACH THE KEYSTONE'; return; }
+  gemHud.innerHTML = '&#9670; ' + gemCount + ' / ' + gemsTotal;
+}
+function updateTimeHUD(){
+  const s = Math.max(0, Math.ceil(timeLeft));
+  timeChip.textContent = Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+  timeChip.classList.toggle('low', timeLeft <= 10);
+}
+
+// ---------- sound: wood, bells and breath, all synthesised ----------
+// No samples — keeps the game a single self-contained file, and pure synthesis
+// suits the geometric abstraction better than recorded foley would.
+let actx = null, masterGain = null, droneGain = null, noiseBuf = null;
+function audio(){
+  if (!featureOn('sound') && !featureOn('drone')) return null;
+  if (!actx){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    actx = new AC();
+    masterGain = actx.createGain();      // sound effects
+    masterGain.connect(actx.destination);
+    droneGain = actx.createGain();       // the pad, on its own fader
+    droneGain.connect(actx.destination);
+    // shared noise buffer for the wood and breath voices
+    const n = actx.sampleRate * 0.5;
+    noiseBuf = actx.createBuffer(1, n, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < n; i++) d[i] = Math.random()*2 - 1;
+  }
+  if (actx.state === 'suspended') actx.resume();
+  masterGain.gain.value = featureOn('sound')
+    ? FEATURES.sound.slider.value / 100 * 0.5 : 0;
+  droneGain.gain.value = featureOn('drone')
+    ? FEATURES.drone.slider.value / 100 * 0.35 : 0;
+  return actx;
+}
+
+// a filtered noise burst — the wood-block family (steps, thuds, bumps)
+function sfxWood(freq, dur, gain, q){
+  if (!featureOn('sound')) return;
+  const ac = audio(); if (!ac) return;
+  const t = ac.currentTime;
+  const src = ac.createBufferSource(); src.buffer = noiseBuf;
+  const bp = ac.createBiquadFilter();
+  bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = q || 6;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(gain, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(bp); bp.connect(g); g.connect(masterGain);
+  src.start(t); src.stop(t + dur + 0.02);
+}
+
+// detuned inharmonic partials through a soft lowpass — the bell family.
+// Real bells aren't integer harmonics; the slight detune gives gentle beating.
+function sfxBell(freq, dur, gain){
+  if (!featureOn('sound')) return;
+  const ac = audio(); if (!ac) return;
+  const t = ac.currentTime;
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(Math.min(6000, freq * 7), t);
+  lp.frequency.exponentialRampToValueAtTime(Math.max(400, freq * 1.6), t + dur);
+  lp.Q.value = 0.6;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  lp.connect(g); g.connect(masterGain);
+  // partial, amplitude, decay scale, detune cents — higher partials die sooner
+  const parts = [
+    [1.00, 1.00, 1.00,  0],
+    [2.01, 0.42, 0.72, +3],
+    [2.76, 0.22, 0.55, -4],
+    [3.94, 0.12, 0.40, +6],
+    [5.42, 0.06, 0.28, -7],
+  ];
+  for (const [mult, amp, dscale, cents] of parts){
+    const o = ac.createOscillator();
+    o.type = 'sine';
+    o.frequency.value = freq * mult;
+    o.detune.value = cents;
+    const og = ac.createGain();
+    og.gain.setValueAtTime(amp, t);
+    og.gain.exponentialRampToValueAtTime(0.0001, t + dur * dscale);
+    o.connect(og); og.connect(lp);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  // a soft strike transient so it has a body, not just a tone
+  const src = ac.createBufferSource(); src.buffer = noiseBuf;
+  const bp = ac.createBiquadFilter();
+  bp.type = 'bandpass'; bp.frequency.value = freq * 2; bp.Q.value = 1.5;
+  const ng = ac.createGain();
+  ng.gain.setValueAtTime(gain * 0.25, t);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+  src.connect(bp); bp.connect(ng); ng.connect(masterGain);
+  src.start(t); src.stop(t + 0.08);
+}
+
+// a filtered noise sweep — the breath family (flips, swivels, portals)
+function sfxBreath(f0, f1, dur, gain){
+  if (!featureOn('sound')) return;
+  const ac = audio(); if (!ac) return;
+  const t = ac.currentTime;
+  const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+  const bp = ac.createBiquadFilter();
+  bp.type = 'bandpass'; bp.Q.value = 2.5;
+  bp.frequency.setValueAtTime(f0, t);
+  bp.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t + dur*0.25);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(bp); bp.connect(g); g.connect(masterGain);
+  src.start(t); src.stop(t + dur + 0.02);
+}
+
+// a swept chorus through a moving filter — portals in/out. Three detuned
+// voices plus a fifth give it body; the filter follows the pitch so it
+// blooms rather than whistles.
+function sfxSweep(f0, f1, dur, gain, type){
+  if (!featureOn('sound')) return;
+  const ac = audio(); if (!ac) return;
+  const t = ac.currentTime;
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(f0 * 4, t);
+  lp.frequency.exponentialRampToValueAtTime(Math.max(200, f1 * 4), t + dur);
+  lp.Q.value = 1.2;
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(gain, t + dur * 0.15);
+  g.gain.setValueAtTime(gain, t + dur * 0.6);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  lp.connect(g); g.connect(masterGain);
+  // voice: pitch multiplier, amplitude, detune cents
+  const voices = [[1, 1, -6], [1, 0.9, +7], [1.5, 0.35, +2], [0.5, 0.5, -3]];
+  for (const [mult, amp, cents] of voices){
+    const o = ac.createOscillator();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(f0 * mult, t);
+    o.frequency.exponentialRampToValueAtTime(f1 * mult, t + dur);
+    o.detune.value = cents;
+    const og = ac.createGain(); og.gain.value = amp;
+    o.connect(og); og.connect(lp);
+    o.start(t); o.stop(t + dur + 0.05);
+  }
+  // a breath of air under the sweep so it feels like passage, not just tone
+  const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+  const bp = ac.createBiquadFilter();
+  bp.type = 'bandpass'; bp.Q.value = 1.8;
+  bp.frequency.setValueAtTime(f0 * 1.5, t);
+  bp.frequency.exponentialRampToValueAtTime(Math.max(120, f1 * 1.5), t + dur);
+  const ng = ac.createGain();
+  ng.gain.setValueAtTime(0, t);
+  ng.gain.linearRampToValueAtTime(gain * 0.4, t + dur * 0.3);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(bp); bp.connect(ng); ng.connect(masterGain);
+  src.start(t); src.stop(t + dur + 0.05);
+}
+
+// ---------- the drone: a slow pad in C, the key the gems ring in ----------
+// Everything else is tuned to this — the gem scale is C pentatonic and the
+// portal notes are drawn from it, so collection phrases land consonant
+// against the bed rather than fighting it.
+let drone = null;
+function startDrone(){
+  const ac = audio(); if (!ac || drone) return;
+  const t = ac.currentTime;
+  const out = ac.createGain();
+  out.gain.setValueAtTime(0, t);
+  out.gain.linearRampToValueAtTime(1, t + 4);        // fade in slowly
+  const lp = ac.createBiquadFilter();
+  lp.type = 'lowpass'; lp.frequency.value = 700; lp.Q.value = 0.7;
+  lp.connect(out); out.connect(droneGain);
+  // a slow filter sweep so the pad breathes
+  const lfo = ac.createOscillator();
+  lfo.type = 'sine'; lfo.frequency.value = 0.045;
+  const lfoAmt = ac.createGain(); lfoAmt.gain.value = 260;
+  lfo.connect(lfoAmt); lfoAmt.connect(lp.frequency);
+  lfo.start(t);
+  const voices = [];
+  // C2 root, C3 octave, G3 fifth, C4 — an open, unresolved stack
+  const notes = [65.41, 130.81, 196.00, 261.63];
+  const amps  = [0.30, 0.20, 0.13, 0.07];
+  notes.forEach((f, i) => {
+    // two detuned oscillators per note: slow beating gives it life
+    for (const cents of [-5, +5]){
+      const o = ac.createOscillator();
+      o.type = i === 0 ? 'sine' : 'triangle';
+      o.frequency.value = f;
+      o.detune.value = cents;
+      const g = ac.createGain(); g.gain.value = amps[i] * 0.5;
+      o.connect(g); g.connect(lp);
+      o.start(t);
+      voices.push(o);
+    }
+  });
+  // a distant shimmer riding on top
+  const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+  const bp = ac.createBiquadFilter();
+  bp.type = 'bandpass'; bp.frequency.value = 2200; bp.Q.value = 0.8;
+  const ng = ac.createGain(); ng.gain.value = 0.012;
+  const nlfo = ac.createOscillator();
+  nlfo.type = 'sine'; nlfo.frequency.value = 0.07;
+  const nAmt = ac.createGain(); nAmt.gain.value = 0.008;
+  nlfo.connect(nAmt); nAmt.connect(ng.gain);
+  nlfo.start(t);
+  src.connect(bp); bp.connect(ng); ng.connect(out);
+  src.start(t);
+  drone = { out, voices, extra: [lfo, nlfo, src] };
+}
+function stopDrone(){
+  if (!drone || !actx) return;
+  const t = actx.currentTime;
+  drone.out.gain.cancelScheduledValues(t);
+  drone.out.gain.setValueAtTime(drone.out.gain.value, t);
+  drone.out.gain.linearRampToValueAtTime(0, t + 1.2);
+  for (const o of drone.voices) o.stop(t + 1.4);
+  for (const o of drone.extra) o.stop(t + 1.4);
+  drone = null;
+}
+
+// ---------- level lifecycle ----------
+const START_LEVEL = 25;
+let level = START_LEVEL;
+let timeLeft = 0;
+let phase = 'menu'; // 'menu' | 'play' | 'wait'
+const overlay = document.getElementById('overlay');
+const overlayText = document.getElementById('overlayText');
+function showOverlay(text){ overlayText.textContent = text; overlay.style.opacity = 1; }
+function hideOverlay(){ overlay.style.opacity = 0; }
+
+function buildLevel(){
+  clearSeeThrough();
+  if (levelGroup) world.remove(levelGroup);
+  levelGroup = new THREE.Group();
+  world.add(levelGroup);
+  blocked.clear(); rails.clear(); pathFaces.clear(); pathCells.clear(); holes.clear(); holeList.length = 0; bridged.clear();
+  oneways.clear(); onewayMeshes.length = 0;
+  gauntletSpine = null; gauntletWallSeams.clear(); wallRep.clear();
+  clearPushPuzzle();
+  portals.clear(); portalList.length = 0; portalFX.clear();
+  gems.length = 0; gemCount = 0;
+  monumentCells.length = 0;
+  keystoneCell = null; keystoneGroup = null; keystoneAwake = false;
+  keystoneCharge = 0; keystoneBeacon = null;
+
+  const mode = MODE();
+  finishKey = null;
+  const obj = mode.objective;
+
+  // ONE shared layout for every objective: run all the lab's gen() hooks so the
+  // board is the open, breathable Classic layout — sparse blocks, monuments,
+  // negative space — regardless of objective. (maze/walls-only is retired; the
+  // open board is nicer and every objective inherits every dynamic.)
+  for (const k of Object.keys(FEATURES))
+    if (FEATURES[k].on && FEATURES[k].gen) FEATURES[k].gen();
+
+  // the objective layer: what you place on top, and what winning means
+  if (obj === 'collect'){
+    gemsTotal = spawnGems(Math.min(4 + level, 12));
+    if (featureOn('keystone')) placeKeystone();
+  } else if (obj === 'reach'){
+    // a single goal on a far reachable cell — the open board becomes a journey
+    gemsTotal = 0;
+    placeReachGoal();
+  } else if (obj === 'puzzle'){
+    // Sokoban-style state puzzle: push blocks onto target pads. Winning is a
+    // CONFIGURATION (every block on a pad), not reaching a point — the board
+    // has state, and you change it by pushing. Lives on the same open board.
+    gemsTotal = 0;
+    placePushPuzzle();
+  }
+  updateFaceTextures();   // cut any hole openings out of the face surfaces
+  timeLeft = fairTimeLimit();
+
+  world.quaternion.set(0,0,0,1);
+  P.copy(cellToPoint(2, 2, 2));
+  Nf.copy(FACES[2].n);
+  player.quaternion.copy(playerTargetQuat());
+  state = 'idle'; tw = null; peeked = false; portalArmed = null; autoPush = null;
+  skewSign = 1; skewCur = skewTarget(); elevCur = elevTarget(); applyCamera();
+
+  levelChip.textContent = mode.name + ' \u00b7 ' + level;
+  lvlNum.textContent = level;
+  timeChip.style.display = timerActive() ? '' : 'none';
+  drawOneways();
+  updateFaceHUD(); updateGemHUD(); updateTimeHUD();
+  applyShadows();
+  drawTrail();
+}
+
+// falling into a hole: sink, shrink, and reappear at the start cell
+function startFall(){
+  state = 'fall';
+  sfxSweep(300, 70, 0.5, 0.16, 'sine');     // down we go
+  tw = { t:0, dur:550, c0:player.position.clone(), n:Nf.clone() };
+}
+function respawn(){
+  sfxWood(90, 0.18, 0.45, 2);               // the thud at the bottom
+  player.scale.setScalar(1);
+  world.quaternion.set(0,0,0,1);
+  P.copy(cellToPoint(2, 2, 2));
+  Nf.copy(FACES[2].n);
+  player.quaternion.copy(playerTargetQuat());
+  tw = null; state = 'idle';
+  updateFaceHUD();
+  placePlayer(P);
+  drawTrail();
+}
+
+// stepping into a portal: sink into the shaft, then rise out of the partner
+// while the cube rotates to bring the destination face up into view
+// Stepping onto a portal doesn't take you immediately: it arms a short dwell.
+// Keep moving and you cross straight over; linger and it pulls you through.
+// A portal is a choice, not a trap.
+const PORTAL_DWELL = 420;
+let portalArmed = null;      // { key, t }
+let autoPush = null;         // { dir, t } — pending one-way forward push
+
+// a rising tone while the player dwells on a portal — cut short if they leave
+let chargeVoice = null;
+function startChargeTone(key){
+  if (!featureOn('sound')) return;
+  const ac = audio(); if (!ac) return;
+  stopChargeTone();
+  const fx = portalFX.get(key);
+  const n = fx && fx.note ? fx.note : 440;
+  const t = ac.currentTime, dur = PORTAL_DWELL/1000;
+  const o = ac.createOscillator();
+  o.type = 'triangle';
+  o.frequency.setValueAtTime(n * 0.75, t);
+  o.frequency.exponentialRampToValueAtTime(n * 2, t + dur);
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.1, t + dur * 0.5);
+  o.connect(g); g.connect(masterGain);
+  o.start(t);
+  chargeVoice = { o, g };
+}
+function stopChargeTone(){
+  if (!chargeVoice || !actx) return;
+  const t = actx.currentTime;
+  chargeVoice.g.gain.cancelScheduledValues(t);
+  chargeVoice.g.gain.setValueAtTime(chargeVoice.g.gain.value, t);
+  chargeVoice.g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+  chargeVoice.o.stop(t + 0.08);
+  chargeVoice = null;
+}
+
+function startPortal(cellK){
+  state = 'portalIn';
+  const dest = portals.get(cellK).pair;
+  const fxA = portalFX.get(cellK), fxB = portalFX.get(dest);
+  if (fxA){ fxA.flare = 1; fxA.charge = 0; }
+  if (fxB) fxB.flare = 1;
+  // each pair has its own note, so a portal sounds like itself
+  const n = fxA && fxA.note ? fxA.note : 440;
+  sfxSweep(n * 2, n * 0.5, 0.38, 0.16, 'triangle');    // falling in
+  tw = { t:0, dur:380, c0:player.position.clone(), n:Nf.clone(), dest };
+}
+function emergeFromPortal(destKey){
+  const fx = portalFX.get(destKey);
+  if (fx) fx.flare = 1;
+  const n = fx && fx.note ? fx.note : 440;
+  sfxSweep(n * 0.5, n * 2, 0.42, 0.16, 'triangle');    // rising out
+  const [fi, u, v] = destKey.split(',').map(Number);
+  P.copy(cellToPoint(fi, u, v));
+  Nf.copy(FACES[fi].n);
+  player.quaternion.copy(playerTargetQuat());
+  updateFaceHUD();
+  const c1 = P.clone().addScaledVector(Nf, PSIZE/2 + 0.01 + faceLift(fi));
+  // rotate the cube so the destination face faces the camera
+  // rotate the cube so the destination face faces the camera
+  const worldN = Nf.clone().applyQuaternion(world.quaternion);
+  const aim = featureOn('freeCam') ? CAM_DIR.clone() : new THREE.Vector3(0, 1, 0);
+  const qd = worldN.dot(aim) < -0.99
+    ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1,0,0), Math.PI)
+    : new THREE.Quaternion().setFromUnitVectors(worldN, aim);
+  state = 'portalOut';
+  tw = { t:0, dur:560, fromQ: world.quaternion.clone(),
+         toQ: qd.multiply(world.quaternion.clone()).normalize(), c1 };
+}
+
+function levelComplete(){
+  phase = 'wait';
+  // a small rising chord
+  sfxBell(523.25, 1.1, 0.18);
+  setTimeout(() => sfxBell(659.25, 1.1, 0.18), 90);
+  setTimeout(() => sfxBell(783.99, 1.4, 0.2), 180);
+  showOverlay('LEVEL ' + level + ' CLEAR');
+  setTimeout(() => { level++; buildLevel(); hideOverlay(); phase = 'play'; }, 1500);
+}
+function failLevel(){
+  phase = 'wait';
+  sfxSweep(220, 110, 0.9, 0.16, 'triangle');
+  sfxWood(80, 0.5, 0.3, 1.5);
+  showOverlay('OUT OF TIME');
+  setTimeout(() => { buildLevel(); hideOverlay(); phase = 'play'; }, 1500);
+}
+
+// ---------- menu ----------
+const menuEl = document.getElementById('menu');
+const modeList = document.getElementById('modeList');
+for (const key of Object.keys(MODES)){
+  const m = MODES[key];
+  const btn = document.createElement('div');
+  btn.className = 'modeBtn';
+  btn.innerHTML = '<div class="mname">' + m.name + '</div><div class="mdesc">' + m.desc + '</div>';
+  btn.addEventListener('click', () => startMode(key));
+  modeList.appendChild(btn);
+}
+function startMode(key){
+  audio();                      // browsers need a user gesture to start audio
+  if (featureOn('drone')) startDrone();
+  modeKey = key;
+  level = START_LEVEL;
+  buildLevel();
+  menuEl.style.display = 'none';
+  hideOverlay();
+  phase = 'play';
+}
+function openMenu(){
+  phase = 'menu';
+  menuEl.style.display = 'flex';
+}
+document.getElementById('menuBtn').addEventListener('click', openMenu);
+addEventListener('keydown', e => { if (e.code === 'Escape' && phase === 'play') openMenu(); });
+
+// ---------- lab panel ----------
+// Built straight from the FEATURES registry: add an entry there and it
+// appears here automatically. Toggling rebuilds the level so the change
+// takes effect immediately.
+const labEl = document.getElementById('lab');
+const featList = document.getElementById('featList');
+// lab organised into collapsible categories so 24 toggles stay navigable
+const LAB_CATEGORIES = [
+  { name:'OBJECTIVE',  keys:['keystone', 'oneways', 'timer', 'bonusTime', 'sprint'] },
+  { name:'OBSTACLES',  keys:['towers', 'rails', 'holes', 'bridges', 'portals', 'monuments'] },
+  { name:'STONEWORK',  keys:['masonry', 'blockGap', 'bevels', 'tint', 'palette'] },
+  { name:'WORLD',      keys:['facePalette', 'shadows'] },
+  { name:'CAMERA',     keys:['skewView', 'freeCam', 'seeThrough'] },
+  { name:'AUDIO',      keys:['sound', 'drone'] },
+  { name:'TESTING',    keys:['solution'] },
+];
+// build one collapsible section per category, each holding its feature rows
+for (const cat of LAB_CATEGORIES){
+  const header = document.createElement('div');
+  header.className = 'labCat';
+  header.innerHTML = '<span class="catName">' + cat.name + '</span><span class="catChev">\u25be</span>';
+  featList.appendChild(header);
+  const body = document.createElement('div');
+  body.className = 'catBody';
+  featList.appendChild(body);
+  header.addEventListener('click', () => {
+    const collapsed = body.classList.toggle('collapsed');
+    header.querySelector('.catChev').textContent = collapsed ? '\u25b8' : '\u25be';
+  });
+  for (const key of cat.keys){
+    if (FEATURES[key]) buildFeatureRow(key, body);
+  }
+}
+
+function buildFeatureRow(key, container){
+  const f = FEATURES[key];
+  let sl = null;                       // declared before the handler closes over it
+  const row = document.createElement('div');
+  row.className = 'featRow';
+  row.innerHTML =
+    '<div><div class="fname">' + f.name + '</div>' +
+    '<div class="fdesc">' + f.desc + '</div></div>' +
+    '<div class="tog"></div>';
+  const tog = row.querySelector('.tog');
+  const sync = () => tog.classList.toggle('on', f.on);
+  sync();
+  row.addEventListener('click', () => {
+    f.on = !f.on;
+    sync();
+    if (sl) sl.style.display = f.on ? 'block' : 'none';
+    if (phase === 'menu') return;
+    // display-only switches must not regenerate the level under test
+    if (key === 'solution') drawTrail();
+    else if (key === 'facePalette'){ updateFaceTextures(); }
+    else if (key === 'palette'){ applyPalette(); buildLevel(); }
+    else if (key === 'tint'){ clearTintCache(); buildLevel(); }
+    else if (key === 'monuments') buildLevel();
+    else if (key === 'masonry') buildLevel();
+    else if (key === 'blockGap'){ applyBevels(); buildLevel(); }
+    else if (key === 'bevels'){ applyBevels(); rebuildBridgeGeo(); buildLevel(); }
+    else if (key === 'shadows') applyShadows();
+    else if (key === 'sound'){ if (f.on) audio(); else stopChargeTone(); }
+    else if (key === 'drone'){ if (f.on){ audio(); startDrone(); } else stopDrone(); }
+    else if (key === 'seeThrough'){ if (!f.on) clearSeeThrough(); }
+    else if (key === 'freeCam' || key === 'skewView'){
+      if (key === 'skewView') skewCur = skewTarget();
+      applyCamera();
+    }
+    else buildLevel();
+  });
+  container.appendChild(row);
+
+  // live sliders for features that declare them — tune while playing
+  const slDefs = [];
+  if (f.slider) slDefs.push(Object.assign({ key:'main', label:null }, f.slider));
+  if (f.sliders) for (const s of f.sliders) slDefs.push(s);
+  if (slDefs.length){
+    sl = document.createElement('div');
+    sl.style.display = f.on ? 'block' : 'none';
+    for (const def of slDefs){
+      const row = document.createElement('div');
+      row.className = 'featSlider';
+      const inp = document.createElement('input');
+      inp.type = 'range';
+      inp.min = def.min; inp.max = def.max; inp.step = def.step; inp.value = def.value;
+      const val = document.createElement('span');
+      const labelFor = (dk, v) =>
+        (key === 'palette' && dk === 'main' && STONE_PALETTES[v]) ? STONE_PALETTES[v].name
+        : (key === 'facePalette' && dk === 'main' && FACE_PALETTES[v]) ? FACE_PALETTES[v].name
+        : v + (def.unit || '');
+      val.textContent = labelFor(def.key, def.value);
+      inp.addEventListener('input', () => {
+        const v = parseFloat(inp.value);
+        if (def.key === 'main') f.slider.value = v; else def.value = v;
+        val.textContent = labelFor(def.key, v);
+        if (key === 'skewView'){ skewCur = skewTarget(); elevCur = elevTarget(); }
+        if (key === 'sound' && masterGain) masterGain.gain.value = v/100 * 0.5;
+        if (key === 'drone' && droneGain) droneGain.gain.value = v/100 * 0.35;
+        if (key === 'shadows') applyShadows();
+        if (key === 'tint'){
+          clearTimeout(tintTimer);
+          tintTimer = setTimeout(() => { clearTintCache(); buildLevel(); }, 140);
+        }
+        if (key === 'facePalette') updateFaceTextures();
+        if (key === 'palette'){
+          applyPalette();
+          clearTimeout(palTimer);
+          palTimer = setTimeout(() => buildLevel(), 140);
+        }
+        if (key === 'monuments'){
+          clearTimeout(monTimer);
+          monTimer = setTimeout(() => buildLevel(), 140);
+        }
+        if (key === 'masonry'){
+          clearTimeout(masTimer);
+          masTimer = setTimeout(() => buildLevel(), 140);
+        }
+        if (key === 'blockGap'){
+          clearTimeout(gapTimer);
+          gapTimer = setTimeout(() => { applyBevels(); buildLevel(); }, 140);
+        }
+        applyCamera();
+      });
+      if (def.label){
+        const lbl = document.createElement('div');
+        lbl.className = 'slLabel';
+        lbl.textContent = def.label;
+        lbl.title = def.hint || '';
+        sl.appendChild(lbl);
+      }
+      row.append(inp, val);
+      sl.appendChild(row);
+    }
+    container.appendChild(sl);
+  }
+}
+document.getElementById('labBtn').addEventListener('click', () => {
+  labEl.style.display = labEl.style.display === 'flex' ? 'none' : 'flex';
+});
+document.getElementById('labClose').addEventListener('click', () => {
+  labEl.style.display = 'none';
+});
+
+// level selector: jump straight to any level with the current feature set —
+// the point of the lab is testing combinations without grinding there
+const lvlNum = document.getElementById('lvlNum');
+function setLevel(n){
+  level = Math.max(1, Math.min(99, n));
+  lvlNum.textContent = level;
+  if (phase !== 'menu') buildLevel();
+}
+document.getElementById('lvlDown').addEventListener('click', () => setLevel(level - 1));
+document.getElementById('lvlUp').addEventListener('click', () => setLevel(level + 1));
+
+// ---------- movement state machine ----------
+let state = 'idle';
+let peeked = false;               // cube rotated for a look-around, player may be hidden
+let tw = null;
+
+const _mid = new THREE.Vector3();
+const _wDir = new THREE.Vector3(), _sDir = new THREE.Vector3();
+
+// Direction selection: candidates are the 4 grid axes of the current face,
+// scored in screen space. On the top-position plane they project to perfect
+// diagonals and tie, so a ±45° bias breaks the tie — and its handedness
+// (diagBias) flips at edge crossings so the held key keeps meaning 'forward'
+// whichever side you arrived from (heading continuity).
+let diagBias = 1;
+function pickDir(sx, sy, bias, qOverride){
+  const wq = qOverride || world.quaternion;
+  // With SKEWED VIEW the four directions project to distinct screen angles, so
+  // the tie is broken by geometry — no bias needed (and it would fight the view).
+  if (featureOn('skewView') && !featureOn('freeCam')){
+    let best = null, bestScore = 0.25;
+    for (const a of AXES){
+      if (Math.abs(a.dot(Nf)) > 0.5) continue;
+      _wDir.copy(a).applyQuaternion(wq);
+      _sDir.copy(_wDir).applyQuaternion(_invCamQ);
+      const score = _sDir.x*sx + _sDir.y*sy;
+      if (score > bestScore){ bestScore = score; best = a; }
+    }
+    return best;
+  }
+  // Under the free camera there's no fixed convention to snap to, so ties are
+  // broken against the camera's own angle — deterministic at any orbit.
+  const b = featureOn('freeCam')
+    ? (Math.cos(camAz) * Math.sin(camAz) >= 0 ? 1 : -1)
+    : bias;
+  const bx = (sx + b*sy) * Math.SQRT1_2;
+  const by = (sy - b*sx) * Math.SQRT1_2;
+  let best = null, bestScore = 0.25;
+  for (const a of AXES){
+    if (Math.abs(a.dot(Nf)) > 0.5) continue;
+    _wDir.copy(a).applyQuaternion(wq);
+    _sDir.copy(_wDir).applyQuaternion(_invCamQ);
+    const score = _sDir.x*sx + _sDir.y*sy + 0.2*(_sDir.x*bx + _sDir.y*by);
+    if (score > bestScore){ bestScore = score; best = a; }
+  }
+  return best;
+}
+
+function tryStep(sx, sy, resolveQ){
+  if (state !== 'idle' || phase !== 'play') return;
+  autoPush = null;                    // a deliberate move overrides the tile's push
+  const D = pickDir(sx, sy, diagBias, resolveQ);
+  if (!D) return;
+  executeStep(D, resolveQ, sx, sy);
+}
+
+// perform a step in cube-local direction D. Shared by player input and the
+// one-way auto-push, so both obey the same edge/wall/one-way rules. sx/sy are
+// the originating screen coords (for heading continuity after a crossing); the
+// auto-push has none, so they fall back to the resolved direction itself.
+function executeStep(D, resolveQ, sx, sy){
+  if (state !== 'idle' || phase !== 'play') return;
+
+  // one-way tile: refuse to leave against the arrow (matches neighborsOf, so
+  // what the player can do equals what the solver planned). Instead of a dead
+  // stop, the player lurches at the invisible barrier and springs back.
+  const hereFi = faceIndexOf(Nf);
+  const hereC = pointToCell(hereFi, P);
+  const owDir = oneways.get(cellKey(hereFi, hereC.u, hereC.v));
+  if (owDir && D.dot(owDir) < 0.9){
+    state = 'bounce';
+    sfxWood(140, 0.11, 0.55, 2);            // a dull thud against the barrier
+    sfxBreath(320, 520, 0.18, 0.06);        // a little rebound whoosh
+    tw = { t:0, dur:260, fromP:P.clone(), pushDir:D.clone() };
+    return;
+  }
+
+  // moving off a portal before its dwell expires: you've declined it
+  if (portalArmed){
+    const fx = portalFX.get(portalArmed.key);
+    if (fx) fx.charge = 0;
+    portalArmed = null;
+    stopChargeTone();
+  }
+
+  if (rails.has(railKey(_mid.copy(P).addScaledVector(D, CELL/2)))){
+    sfxWood(150, 0.09, 0.5, 3);      // bump: a blocked move should be heard
+    return;
+  }
+
+  const cand = P.clone().addScaledVector(D, CELL);
+  const [ta, tb] = basisOf(Nf);
+  const inside =
+    Math.abs(cand.dot(ta)) <= H - CELL/2 + 1e-4 &&
+    Math.abs(cand.dot(tb)) <= H - CELL/2 + 1e-4;
+
+  if (inside){
+    const fi = faceIndexOf(Nf);
+    const c = pointToCell(fi, cand);
+    // push block? try to shove it; if it moves, the player follows into its cell
+    const destK = cellKey(fi, c.u, c.v);
+    if (pushBlocks.has(destK)){
+      const pc = pointToCell(fi, P);
+      if (tryPush(destK, cellKey(fi, pc.u, pc.v), D)){
+        sfxWood(90, 0.14, 0.6, 2);
+        // follow the block into its old cell, in sync, so the player's face
+        // stays in contact with the block rather than leaving a gap
+        if (walkable(fi, c.u, c.v)){
+          state = 'slide';
+          tw = { t:0, dur:150, fromP:P.clone(), toP:cand };
+        }
+      } else sfxWood(150, 0.09, 0.5, 3);                        // block won't budge
+      return;
+    }
+    if (!walkable(fi, c.u, c.v)){ sfxWood(150, 0.09, 0.5, 3); return; }  // bump
+    state = 'slide';
+    // slight random pitch so repeated steps don't machine-gun
+    sfxWood(380 + Math.random()*90, 0.045, 0.28, 8);
+    tw = { t:0, dur:SLIDE_MS * speed(), fromP:P.clone(), toP:cand };
+  } else {
+    const toP = P.clone().addScaledVector(D, CELL/2).addScaledVector(Nf, -CELL/2);
+    const nfIdx = faceIndexOf(D);
+    const lc = pointToCell(nfIdx, toP);
+    // push block across the edge? shove it, player stays on this face
+    const destK = cellKey(nfIdx, lc.u, lc.v);
+    if (pushBlocks.has(destK)){
+      const pfi = faceIndexOf(Nf);
+      const pc = pointToCell(pfi, P);
+      if (tryPush(destK, cellKey(pfi, pc.u, pc.v), D)) sfxWood(90, 0.14, 0.6, 2);
+      else sfxWood(150, 0.09, 0.5, 3);
+      return;
+    }
+    if (!walkable(nfIdx, lc.u, lc.v)) return;
+
+    // decide against where the view is SETTLING to, not its mid-flight state
+    const decideQ = resolveQ || (viewEase ? viewEase.toQ : world.quaternion);
+    const worldN = D.clone().applyQuaternion(decideQ);
+    const axis = new THREE.Vector3().crossVectors(Nf, D).normalize();
+    const c0 = P.clone().addScaledVector(Nf, PSIZE/2 + 0.01 + faceLift(faceIndexOf(Nf)));
+    const c1 = toP.clone().addScaledVector(D, PSIZE/2 + 0.01 + faceLift(nfIdx));
+    const bulge = Nf.clone().add(D).normalize();
+    const q0 = player.quaternion.clone();
+
+    // destination visible from the current camera -> the player flips over the
+    // edge (cube static). Genuinely on the far side -> the cube swivels to
+    // bring that plane into view, player riding along. Uses a back-face test
+    // (dot > 0) rather than a margin: at axis-aligned camera angles a face can
+    // sit exactly edge-on, and a margin would swivel when it needn't.
+    if (worldN.dot(CAM_DIR) > 0.001){
+      state = 'flip';
+      sfxBreath(900, 400, 0.3, 0.12);        // the player tumbling over an edge
+      tw = { t:0, dur:FLIP_MS * speed(), fromP:P.clone(), toP, axis, c0, c1, bulge, q0 };
+    } else {
+      // rotate the cube about the shared edge so the new face takes the old
+      // one's place. If a view settle is in flight, start from its target so
+      // the two rotations compose instead of fighting.
+      const baseQ = viewEase ? viewEase.toQ.clone() : world.quaternion.clone();
+      viewEase = null;
+      const qLocal = new THREE.Quaternion().setFromUnitVectors(D, Nf);
+      state = 'swivel';
+      sfxBreath(500, 180, 0.5, 0.2);         // the whole cube turning: deeper, longer
+      tw = { t:0, dur:SWIVEL_MS * speed(), fromP:P.clone(), toP, axis, c0, c1, bulge, q0,
+             fromQ: world.quaternion.clone(),
+             toQ: baseQ.multiply(qLocal).normalize() };
+    }
+    // heading continuity: after the crossing, the key that carried you over
+    // must keep meaning 'forward' (which is -oldNormal on the new face).
+    // Flip the diagonal handedness if that's what forward requires.
+    const cont = Nf.clone().negate();
+    Nf.copy(D);
+    // auto-push has no screen coords: project D to screen so scoring still works
+    let ssx = sx, ssy = sy;
+    if (ssx === undefined){
+      _sDir.copy(D).applyQuaternion(resolveQ || world.quaternion).applyQuaternion(_invCamQ);
+      ssx = _sDir.x; ssy = _sDir.y;
+    }
+    for (const b of [diagBias, -diagBias]){
+      const p = pickDir(ssx, ssy, b);
+      if (p && p.dot(cont) > 0.9){ diagBias = b; break; }
+    }
+    updateFaceHUD();
+  }
+}
+
+// ---------- free look: spin the cube to any angle ----------
+// A purely visual rotation — the player's face and position never change.
+// Hold Q/E to turn the cube continuously about the vertical screen axis.
+// Movement then snaps to the nearest clean orientation first, so direction
+// scoring is never ambiguous (it ties at 45°).
+const SCREEN_UP = new THREE.Vector3(0, 1, 0);
+const SPIN_SPEED = 1.7;                 // radians per second
+const _spinQ = new THREE.Quaternion();
+function spin(dir, dt){
+  if (phase !== 'play') return;
+  // allowed mid-step: rotating while the player moves is the point
+  if (state === 'swivel' || state === 'portalIn' || state === 'portalOut') return;
+  if (featureOn('freeCam')){
+    // orbit the camera; the cube stays put. The swivel handles hidden planes.
+    camAz += dir * SPIN_SPEED * dt / 1000;
+    applyCamera();
+    return;
+  }
+  viewEase = null;                    // manual input takes the wheel
+  _spinQ.setFromAxisAngle(SCREEN_UP, dir * SPIN_SPEED * dt / 1000);
+  world.quaternion.premultiply(_spinQ).normalize();
+  peeked = true;
+}
+// is the player's face turned toward the camera?
+function playerVisible(q){
+  return Nf.clone().applyQuaternion(q || world.quaternion).dot(CAM_DIR) > 0.001;
+}
+
+// the skew we want right now (signed), in radians
+function skewTarget(){
+  if (!featureOn('skewView') || featureOn('freeCam')) return 0;
+  return skewSign * FEATURES.skewView.slider.value * Math.PI/180;
+}
+
+// Elevation help for the two blind zones of a fixed camera. Both scale with
+// how deep into the zone the player is, so it eases in.
+function elevTarget(){
+  if (!featureOn('skewView') || featureOn('freeCam')) return ISO_EL;
+  const S = FEATURES.skewView.sliders;
+  const lift = S[0].value * Math.PI/180, dip = S[1].value * Math.PI/180;
+  // keep the view usable: too flat and the planes go edge-on, too steep and
+  // the sides vanish
+  const clamp = e => Math.min(1.30, Math.max(0.22, e));   // ~12.5° .. ~74.5°
+  // where is the player, in world space, on the cube?
+  const wp = P.clone().applyQuaternion(world.quaternion);
+  const wn = Nf.clone().applyQuaternion(world.quaternion);
+  if (Math.abs(wn.y) < 0.5){
+    // side plane: the further down, the lower the view drops
+    const depth = Math.min(1, Math.max(0, (H*0.35 - wp.y) / (H * 1.35)));
+    return clamp(ISO_EL - lift * depth);
+  }
+  if (wn.y > 0.5){
+    // top plane: the further toward the far edge, the higher the view rises
+    const away = CAM_DIR.clone().setY(0).normalize().negate();
+    const d = wp.clone().setY(0).dot(away) / H;          // -1 near .. +1 far
+    const depth = Math.min(1, Math.max(0, (d - 0.05) / 0.95));
+    return clamp(ISO_EL + dip * depth);
+  }
+  return ISO_EL;
+}
+// ease the camera skew and elevation toward their targets
+function updateSkew(dt){
+  const ts = skewTarget(), te = elevTarget();
+  const ds = Math.abs(skewCur - ts), de = Math.abs(elevCur - te);
+  if (ds < 0.0005 && de < 0.0005){
+    if (skewCur !== ts || elevCur !== te){
+      skewCur = ts; elevCur = te; applyCamera();
+    }
+    return;
+  }
+  const k = 1 - Math.exp(-6 * dt / 1000);
+  skewCur += (ts - skewCur) * k;
+  elevCur += (te - elevCur) * k;
+  applyCamera();
+}
+// on arriving at a new plane, mirror the skew if this plane is the squashed one.
+// A side plane is 'favoured' when the camera has swung toward it.
+function updateSkewSign(){
+  if (!featureOn('skewView') || featureOn('freeCam')) return;
+  const wn = Nf.clone().applyQuaternion(world.quaternion);
+  if (Math.abs(wn.y) > 0.5) return;          // top/bottom: no side preference
+  // camera azimuth swings toward +z as skew grows: favour whichever side plane
+  // the player is on
+  const wantSign = wn.z > 0.5 ? 1 : (wn.x > 0.5 ? -1 : skewSign);
+  skewSign = wantSign;
+}
+// settle the free-spun view: snap to the nearest grid-square orientation, then
+// quarter-turn as needed until the player's face is back in view
+// Settle the free-spun view. This runs ALONGSIDE the player's step, not before
+// it: it starts an independent camera-only ease and reports the settled
+// orientation so the step resolves against where the view is going, not where
+// it currently is. One key press = snap and step, together.
+let viewEase = null;      // { t, dur, fromQ, toQ } — camera only, never blocks
+function settleView(){
+  peeked = false;
+  let target;
+  if (featureOn('freeCam')){
+    // free camera: rotate the CUBE so the player's plane faces the camera
+    if (playerVisible()) return null;
+    target = world.quaternion.clone();
+    const axis = new THREE.Vector3(0, 1, 0);
+    for (let i = 0; i < 4 && !playerVisible(target); i++){
+      target = new THREE.Quaternion()
+        .setFromAxisAngle(axis, Math.PI/2).multiply(target).normalize();
+    }
+    if (!playerVisible(target)) return null;
+  } else {
+    target = snapToGrid(world.quaternion);
+    for (let i = 0; i < 4 && !playerVisible(target); i++){
+      target = new THREE.Quaternion()
+        .setFromAxisAngle(SCREEN_UP, Math.PI/2)
+        .multiply(target).normalize();
+    }
+  }
+  if (world.quaternion.angleTo(target) < 0.02) return null;
+  viewEase = { t:0, dur:340, fromQ: world.quaternion.clone(), toQ: target.clone() };
+  return target;
+}
+// nearest orientation whose axes are camera-aligned (grid square on screen)
+function snapToGrid(q){
+  const m = new THREE.Matrix4().makeRotationFromQuaternion(q);
+  const cols = [
+    new THREE.Vector3().setFromMatrixColumn(m, 0),
+    new THREE.Vector3().setFromMatrixColumn(m, 1),
+    new THREE.Vector3().setFromMatrixColumn(m, 2),
+  ];
+  const snap = v => {
+    const a = [Math.abs(v.x), Math.abs(v.y), Math.abs(v.z)];
+    const i = a.indexOf(Math.max(...a));
+    const o = new THREE.Vector3();
+    o.setComponent(i, Math.sign(v.getComponent(i)) || 1);
+    return o;
+  };
+  const x = snap(cols[0]);
+  let y = snap(cols[1]);
+  if (Math.abs(x.dot(y)) > 0.5) y = snap(cols[2]);       // degenerate: use z
+  const z = new THREE.Vector3().crossVectors(x, y);
+  return new THREE.Quaternion().setFromRotationMatrix(
+    new THREE.Matrix4().makeBasis(x, y, z)).normalize();
+}
+// ---------- input ----------
+const keys = {};
+addEventListener('keydown', e => keys[e.code] = true);
+addEventListener('keyup',   e => keys[e.code] = false);
+function pollKeys(){
+  const moving = keys['ArrowUp'] || keys['KeyW'] || keys['ArrowDown'] || keys['KeyS'] ||
+                 keys['ArrowLeft'] || keys['KeyA'] || keys['ArrowRight'] || keys['KeyD'];
+  // settle the view and step on the SAME press — the camera eases back while
+  // the player moves, rather than the snap eating the first keystroke.
+  // While Q/E is held you're steering: don't fight it, just move.
+  const steering = keys['KeyQ'] || keys['KeyE'];
+  let resolveQ = null;
+  if (moving && peeked && !steering) resolveQ = settleView();
+  if (keys['ArrowUp']    || keys['KeyW']) return tryStep(0, 1, resolveQ);
+  if (keys['ArrowDown']  || keys['KeyS']) return tryStep(0,-1, resolveQ);
+  if (keys['ArrowLeft']  || keys['KeyA']) return tryStep(-1,0, resolveQ);
+  if (keys['ArrowRight'] || keys['KeyD']) return tryStep(1, 0, resolveQ);
+}
+// swipe to move — but not when the drag starts on the UI (lab panel, menu),
+// where a drag means scrolling
+let swipe = null;
+addEventListener('pointerdown', e => {
+  if (e.target.closest && e.target.closest('#lab, #menu, #hud, #touchControls')) return;
+  swipe = { x:e.clientX, y:e.clientY };
+});
+addEventListener('pointerup', e => {
+  if (!swipe) return;
+  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+  swipe = null;
+  if (Math.hypot(dx,dy) < 18) return;
+  if (Math.abs(dx) > Math.abs(dy)) tryStep(Math.sign(dx), 0);
+  else tryStep(0, -Math.sign(dy));
+});
+
+// ---------- on-screen touch controls ----------
+// The D-pad drives the SAME key flags the poll reads, so all the settle/steer
+// logic applies exactly as with a real keyboard. Movement buttons fire a single
+// step per tap; turn buttons hold the spin while pressed.
+const DIR_KEY = { up:'ArrowUp', down:'ArrowDown', left:'ArrowLeft', right:'ArrowRight' };
+function bindHoldButton(el, onDown, onUp){
+  if (!el) return;
+  const down = e => { e.preventDefault(); onDown(); };
+  const up   = e => { e.preventDefault(); onUp && onUp(); };
+  el.addEventListener('pointerdown', down);
+  el.addEventListener('pointerup', up);
+  el.addEventListener('pointercancel', up);
+  el.addEventListener('pointerleave', up);
+}
+// direction buttons mirror the keyboard exactly: press sets the key flag, release
+// clears it. pollKeys (each idle frame) turns that into one step per tap and a
+// natural repeat when held — honouring movement state, portals, one-ways, etc.
+for (const el of document.querySelectorAll('#dpad .dbtn[data-dir]')){
+  const k = DIR_KEY[el.dataset.dir];
+  bindHoldButton(el,
+    () => { audio(); keys[k] = true; },
+    () => { keys[k] = false; });
+}
+// turn buttons: hold to spin the cube (same as holding Q / E)
+bindHoldButton(document.getElementById('tQ'),
+  () => { audio(); keys['KeyQ'] = true; }, () => { keys['KeyQ'] = false; });
+bindHoldButton(document.getElementById('tE'),
+  () => { audio(); keys['KeyE'] = true; }, () => { keys['KeyE'] = false; });
+
+// detect touch capability and tag the body so controls show even on hybrids
+if (window.matchMedia && window.matchMedia('(pointer:coarse)').matches) document.body.classList.add('touch');
+addEventListener('touchstart', () => document.body.classList.add('touch'), { once:true, passive:true });
+
+// ---------- easing ----------
+const easeSlide = t => 1 - (1-t)*(1-t);
+const easeFlip  = t => t<0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2, 3)/2;
+const _flipV = new THREE.Vector3(), _flipQ = new THREE.Quaternion();
+
+// ---------- main loop ----------
+let last = performance.now();
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min(50, now - last); last = now;
+
+  if (phase === 'menu'){
+    if (featureOn('freeCam')){ camAz += 0.00035 * dt; applyCamera(); }
+    else world.rotateY(0.00035 * dt);   // gentle attract-mode spin
+  }
+
+  if (phase === 'play' && timerActive()){
+    timeLeft -= dt / 1000;
+    if (timeLeft <= 0){ timeLeft = 0; updateTimeHUD(); failLevel(); }
+    else {
+      updateTimeHUD();
+      // a soft tick in the last ten seconds, quickening as it runs out
+      if (timeLeft <= 10){
+        const step = timeLeft <= 3 ? 0.25 : timeLeft <= 6 ? 0.5 : 1;
+        if (Math.floor(timeLeft/step) !== Math.floor((timeLeft + dt/1000)/step))
+          sfxWood(1200, 0.04, 0.16, 12);
+      }
+    }
+  }
+
+  // camera rotation runs regardless of movement state — hold Q/E while walking
+  if (phase === 'play'){
+    if (keys['KeyQ'])      spin(1, dt);
+    else if (keys['KeyE']) spin(-1, dt);
+  }
+  if (phase === 'play' && state === 'idle'){
+    pollKeys();
+  } else if (tw){
+    tw.t += dt;
+    const raw = Math.min(1, tw.t / tw.dur);
+    if (state === 'fall'){
+      const k = raw * raw; // accelerate downward
+      player.position.copy(tw.c0).addScaledVector(tw.n, -k * HOLE_DEPTH);
+      player.scale.setScalar(Math.max(0.35, 1 - 0.5 * k));
+      if (raw >= 1) respawn();
+    } else if (state === 'bounce'){
+      // out-and-back: a quick lurch toward the barrier, then a spring return.
+      // sin gives a smooth there-and-back; the cube visibly refuses the move.
+      const push = Math.sin(raw * Math.PI) * CELL * 0.32;
+      const local = tw.fromP.clone().addScaledVector(tw.pushDir, push);
+      P.copy(local);
+      player.position.copy(P).addScaledVector(Nf, PSIZE/2 + 0.01 + faceLift(faceIndexOf(Nf)));
+      // a tiny recoil tilt into the barrier for physicality
+      const tilt = Math.sin(raw * Math.PI) * 0.18;
+      const axis = new THREE.Vector3().crossVectors(Nf, tw.pushDir).normalize();
+      _flipQ.setFromAxisAngle(axis, tilt);
+      player.quaternion.copy(_flipQ);
+      if (raw >= 1){
+        P.copy(tw.fromP);
+        player.position.copy(P).addScaledVector(Nf, PSIZE/2 + 0.01 + faceLift(faceIndexOf(Nf)));
+        player.quaternion.identity();
+        tw = null; state = 'idle';
+      }
+    } else if (state === 'portalIn'){
+      const k = raw * raw;
+      player.position.copy(tw.c0).addScaledVector(tw.n, -k * HOLE_DEPTH);
+      player.scale.setScalar(Math.max(0.4, 1 - 0.5 * k));
+      if (raw >= 1) emergeFromPortal(tw.dest);
+    } else if (state === 'portalOut'){
+      const k = 1 - (1 - raw) * (1 - raw);
+      world.quaternion.copy(tw.fromQ).slerp(tw.toQ, k);
+      player.position.copy(tw.c1).addScaledVector(Nf, -HOLE_DEPTH * (1 - k));
+      player.scale.setScalar(0.5 + 0.5 * k);
+      if (raw >= 1){
+        world.quaternion.copy(tw.toQ);
+        player.scale.setScalar(1);
+        tw = null; state = 'idle';
+        drawTrail();
+      }
+    } else {
+      if (state === 'slide'){
+        P.copy(tw.fromP).lerp(tw.toP, easeSlide(raw));
+      } else {
+        const k = easeFlip(raw);
+        P.copy(tw.fromP).lerp(tw.toP, k);
+        if (state === 'swivel') world.quaternion.copy(tw.fromQ).slerp(tw.toQ, k);
+        _flipV.copy(tw.c0).lerp(tw.c1, k)
+          .addScaledVector(tw.bulge, Math.sin(Math.PI * k) * CELL * 0.45);
+        player.position.copy(_flipV);
+        _flipQ.setFromAxisAngle(tw.axis, k * Math.PI / 2);
+        player.quaternion.copy(_flipQ).multiply(tw.q0);
+      }
+      if (raw >= 1){
+        P.copy(tw.toP);
+        if (tw.toQ){ world.quaternion.copy(tw.toQ).normalize(); }
+        tw = null; state = 'idle';
+        updateSkewSign();      // cube has settled: favour the plane we're on
+        const fi = faceIndexOf(Nf);
+        const c = pointToCell(fi, P);
+        const hereK = cellKey(fi, c.u, c.v);
+        if (holes.has(hereK)) startFall();
+        else if (portals.has(hereK)){
+          portalArmed = { key: hereK, t: 0 };
+          startChargeTone(hereK);
+        }
+        else {
+          checkGem();
+          if (isGoalObjective() && finishKey === hereK) levelComplete();
+          else drawTrail();
+          // one-way tile: it carries you onward — a short beat, then a push in
+          // the arrow's direction, so stepping on commits you across it
+          const owDir = oneways.get(hereK);
+          if (owDir && state === 'idle'){
+            autoPush = { dir: owDir.clone(), t: performance.now() + 130 };
+          }        }
+      }
+    }
+  }
+
+  if (state !== 'flip' && state !== 'swivel' && state !== 'fall'
+      && state !== 'portalIn' && state !== 'portalOut'){
+    placePlayer(P);
+    player.quaternion.slerp(playerTargetQuat(), 1 - Math.exp(-0.012*dt*60));
+  }
+
+  // portal light: steady, with a flare on activation and a visible charge-up
+  // one-way auto-push: after landing on an arrow tile and a short beat, the
+  // tile carries the player onward in its direction (with a soft push sound)
+  if (autoPush && state === 'idle' && phase === 'play'){
+    if (now >= autoPush.t){
+      const dir = autoPush.dir;
+      autoPush = null;
+      sfxWood(300, 0.05, 0.3, 6);            // a gentle shove onward
+      sfxBreath(600, 750, 0.14, 0.05);
+      executeStep(dir, world.quaternion);
+    }
+  } else if (autoPush && state !== 'idle' && state !== 'bounce'){
+    // player did something else mid-beat that isn't a bounce — cancel the push
+    // (bounce means they tried the wrong way and are still on the tile)
+  }
+
+  // while the player dwells on it
+  const t = now * 0.001;
+  for (const fx of portalFX.values()){
+    fx.flare = Math.max(0, fx.flare - dt/450);
+    const f = 1 + fx.flare * 2.5 + (fx.charge || 0) * 1.6;
+    fx.lightMat.opacity = Math.min(0.85, 0.32 * f);
+    fx.light.intensity  = 0.45 * (1 + fx.flare * 3.5 + (fx.charge || 0) * 2);
+  }
+
+  // gem idle animation
+  for (const g of gems){
+    if (g.taken) continue;
+    g.mesh.rotateOnAxis(_upY, 0.015);
+    g.mesh.position.copy(g.pos).addScaledVector(
+      FACES[g.face].n,
+      CELL*0.35 + faceLift(g.face) + Math.sin(t*2 + g.phase)*CELL*0.06
+    );
+  }
+
+  // solution trail: a pulse flows along the dots toward the goal
+  for (const d of dots){
+    const w = Math.sin(t*3 - d.i*0.45);
+    d.mesh.material.opacity = 0.28 + 0.34 * Math.max(0, w);
+    d.mesh.scale.setScalar(d.base * (0.85 + 0.3 * Math.max(0, w)));
+  }
+
+  // independent camera settle — runs alongside movement, never blocks it.
+  // Yields to crossings, which own the cube's rotation while they animate.
+  if (viewEase){
+    if (state === 'swivel' || state === 'portalOut'){
+      viewEase = null;                    // the crossing takes over
+    } else {
+      viewEase.t += dt;
+      const k = Math.min(1, viewEase.t / viewEase.dur);
+      world.quaternion.copy(viewEase.fromQ).slerp(viewEase.toQ, easeFlip(k));
+      if (k >= 1){ world.quaternion.copy(viewEase.toQ).normalize(); viewEase = null; }
+    }
+  }
+
+  // portal dwell: linger on a portal and it takes you; step away and it doesn't
+  if (portalArmed && phase === 'play' && state === 'idle'){
+    portalArmed.t += dt;
+    const fx = portalFX.get(portalArmed.key);
+    if (fx) fx.charge = Math.min(1, portalArmed.t / PORTAL_DWELL);
+    if (portalArmed.t >= PORTAL_DWELL){
+      const k = portalArmed.key;
+      portalArmed = null;
+      stopChargeTone();
+      startPortal(k);
+    }
+  }
+
+  if (phase === 'play') updateSkew(dt);
+  if (phase === 'play') tickKeystone(dt);
+  if (phase === 'play') tickPushBlocks(dt);
+  updateSeeThrough(dt);
+
+  renderer.render(scene, camera);
+}
+
+applyPalette();        // set the default stone palette before first build
+buildLevel();          // decorative backdrop behind the menu
+requestAnimationFrame(frame);
+
+addEventListener('resize', () => {
+  setupCamera();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+})();
+</script>
+</body>
+</html>
