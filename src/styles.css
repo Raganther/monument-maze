@@ -1,0 +1,186 @@
+  html, body { margin:0; height:100%; overflow:hidden; touch-action:none;
+    -webkit-user-select:none; user-select:none;
+    background: linear-gradient(175deg, #f7e8d8 0%, #ecd5cd 45%, #d5c3d9 100%);
+    font-family: Georgia, 'Times New Roman', serif; }
+  canvas { display:block; }
+
+  #hud {
+    position:fixed; top:16px; left:50%; transform:translateX(-50%);
+    display:flex; gap:10px; align-items:center; pointer-events:none;
+    flex-wrap:wrap; justify-content:center;
+  }
+  .chip {
+    background:rgba(255,252,246,0.75); border:1px solid rgba(90,70,90,0.18);
+    border-radius:20px; padding:6px 14px; color:#5c4a5e; font-size:13px;
+    letter-spacing:2px; display:flex; align-items:center; gap:8px;
+    box-shadow:0 2px 10px rgba(90,70,90,0.08);
+  }
+  #faceDot { width:9px; height:9px; border-radius:50%; background:#eec170; }
+  #timeChip.low { color:#b23a3a; border-color:rgba(178,58,58,0.4); }
+  #menuBtn, #labBtn { pointer-events:auto; cursor:pointer; }
+  #menuBtn:hover, #labBtn:hover { background:rgba(255,252,246,0.95); }
+
+  #lab {
+    position:fixed; top:70px; right:16px; display:none; flex-direction:column;
+    background:rgba(255,252,246,0.94); border:1px solid rgba(90,70,90,0.22);
+    border-radius:12px; padding:14px 16px; width:252px;
+    max-height:calc(100vh - 100px);
+    box-shadow:0 6px 24px rgba(90,70,90,0.16);
+  }
+  #featList {
+    overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch;
+    touch-action:pan-y;
+    min-height:0; flex:1; margin-right:-6px; padding-right:6px;
+  }
+  #featList::-webkit-scrollbar { width:5px; }
+  #featList::-webkit-scrollbar-thumb {
+    background:rgba(90,70,90,0.25); border-radius:3px;
+  }
+  #featList::-webkit-scrollbar-track { background:transparent; }
+  .labTitle { color:#5c4a5e; letter-spacing:4px; font-size:13px; margin-bottom:6px; }
+  .labCat {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:9px 4px 6px 4px; margin-top:4px; cursor:pointer; user-select:none;
+    border-bottom:1px solid rgba(90,70,90,0.12);
+  }
+  .labCat:hover .catName { color:#5c4a5e; }
+  .catName { color:rgba(92,74,94,0.85); font-size:11px; letter-spacing:3px; font-weight:600; }
+  .catChev { color:rgba(92,74,94,0.5); font-size:11px; }
+  .catBody { overflow:hidden; }
+  .catBody.collapsed { display:none; }
+  .labLevel {
+    display:flex; justify-content:space-between; align-items:center;
+    padding-bottom:10px; border-bottom:1px solid rgba(90,70,90,0.15);
+  }
+  .labLevel > span { color:#5c4a5e; font-size:12px; letter-spacing:3px; }
+  .lvlBtns { display:flex; align-items:center; gap:10px; }
+  .lvlBtn {
+    width:24px; height:24px; border-radius:6px; background:rgba(90,70,90,0.12);
+    color:#5c4a5e; font-size:16px; display:flex; align-items:center;
+    justify-content:center; cursor:pointer; user-select:none;
+  }
+  .lvlBtn:hover { background:rgba(90,70,90,0.22); }
+  #lvlNum { color:#5c4a5e; font-size:14px; min-width:20px; text-align:center; }
+  .featRow {
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:9px 0; border-top:1px solid rgba(90,70,90,0.1); cursor:pointer;
+  }
+  .fname { color:#5c4a5e; font-size:13px; letter-spacing:2px; }
+  .fdesc { color:rgba(92,74,94,0.55); font-size:11px; font-style:italic; }
+  .tog {
+    width:34px; height:18px; border-radius:9px; background:rgba(90,70,90,0.18);
+    position:relative; flex:none; transition:background .15s;
+  }
+  .tog::after {
+    content:''; position:absolute; top:2px; left:2px; width:14px; height:14px;
+    border-radius:50%; background:#fff; transition:left .15s;
+    box-shadow:0 1px 3px rgba(90,70,90,0.3);
+  }
+  .tog.on { background:#84b6a6; }
+  .tog.on::after { left:18px; }
+  .slLabel {
+    color:rgba(92,74,94,0.55); font-size:10px; letter-spacing:2px;
+    margin-top:4px;
+  }
+  .featSlider {
+    display:flex; align-items:center; gap:10px; padding:2px 0 10px 0;
+  }
+  .featSlider input[type=range] { flex:1; accent-color:#84b6a6; }
+  .featSlider span { color:rgba(92,74,94,0.7); font-size:11px; min-width:30px; text-align:right; white-space:nowrap; }
+  .labNote { color:rgba(92,74,94,0.45); font-size:10px; font-style:italic; margin-top:8px; }
+  .labClose { margin-top:8px; text-align:center; color:#5c4a5e; font-size:11px; letter-spacing:3px; cursor:pointer; }
+
+  #hint {
+    position:fixed; bottom:16px; left:50%; transform:translateX(-50%);
+    color:rgba(92,74,94,0.5); font-size:11px; letter-spacing:2px;
+    pointer-events:none; white-space:nowrap; font-style:italic;
+  }
+
+  #overlay {
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center;
+    pointer-events:none; opacity:0; transition:opacity 0.35s;
+  }
+  #overlay span {
+    color:#5c4a5e; font-size:34px; letter-spacing:8px;
+    background:rgba(255,252,246,0.85); padding:18px 38px; border-radius:8px;
+    border:1px solid rgba(90,70,90,0.2); box-shadow:0 6px 30px rgba(90,70,90,0.15);
+  }
+
+  #menu {
+    position:fixed; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:8px;
+    background:rgba(247,232,216,0.55); backdrop-filter:blur(3px);
+  }
+  #menu h1 {
+    margin:0; color:#5c4a5e; font-size:42px; letter-spacing:12px; font-weight:normal;
+    text-shadow:0 2px 12px rgba(255,252,246,0.8);
+  }
+  #menu .sub {
+    margin:0 0 26px; color:rgba(92,74,94,0.6); font-size:13px;
+    letter-spacing:4px; font-style:italic;
+  }
+  .modeBtn {
+    width:min(320px, 80vw); background:rgba(255,252,246,0.85);
+    border:1px solid rgba(90,70,90,0.22); border-radius:10px;
+    padding:14px 22px; margin:6px 0; cursor:pointer; text-align:left;
+    box-shadow:0 3px 14px rgba(90,70,90,0.1); transition:transform .12s, box-shadow .12s;
+  }
+  .modeBtn:hover { transform:translateY(-2px); box-shadow:0 6px 20px rgba(90,70,90,0.16); }
+  .modeBtn .mname { color:#5c4a5e; font-size:16px; letter-spacing:4px; }
+  .modeBtn .mdesc { color:rgba(92,74,94,0.6); font-size:12px; font-style:italic; margin-top:4px; }
+
+  /* ---------- on-screen touch controls ---------- */
+  #touchControls {
+    position:fixed; bottom:22px; left:0; right:0; display:none;
+    justify-content:space-between; align-items:flex-end;
+    padding:0 24px; pointer-events:none; z-index:20;
+  }
+  #dpad {
+    display:grid; grid-template-columns:repeat(3, 54px); grid-template-rows:repeat(3, 54px);
+    gap:6px; pointer-events:none;
+  }
+  #dUp    { grid-column:2; grid-row:1; }
+  #dLeft  { grid-column:1; grid-row:2; }
+  .dcenter{ grid-column:2; grid-row:2; background:none; border:none; box-shadow:none; }
+  #dRight { grid-column:3; grid-row:2; }
+  #dDown  { grid-column:2; grid-row:3; }
+  .dbtn, .tbtn {
+    pointer-events:auto; -webkit-user-select:none; user-select:none; touch-action:none;
+    background:rgba(255,252,246,0.82); border:1px solid rgba(90,70,90,0.22);
+    border-radius:14px; color:#5c4a5e; font-size:20px;
+    display:flex; align-items:center; justify-content:center;
+    box-shadow:0 2px 10px rgba(90,70,90,0.12); transition:transform .06s, background .06s;
+  }
+  .dbtn:active, .tbtn:active { transform:scale(0.9); background:rgba(224,160,58,0.35); }
+  #turnPad { display:flex; flex-direction:column; gap:8px; pointer-events:none; }
+  .tbtn { width:54px; height:54px; font-size:26px; }
+
+  /* show the pad on touch / coarse-pointer devices */
+  @media (pointer:coarse) {
+    #touchControls { display:flex; }
+    #hint { display:none; }        /* the keyboard hint is irrelevant on touch */
+  }
+  body.touch #touchControls { display:flex; }
+  body.touch #hint { display:none; }
+
+  /* ---------- narrow-screen (phone) layout ---------- */
+  @media (max-width:560px) {
+    #hud {
+      top:10px; gap:6px; padding:0 8px; width:100%; box-sizing:border-box;
+    }
+    .chip { padding:5px 10px; font-size:11px; letter-spacing:1px; }
+    /* keep only the essential chips; fold the rest behind smaller sizing */
+    #lab {
+      top:auto; bottom:0; right:0; left:0; width:auto;
+      max-height:70vh; border-radius:16px 16px 0 0;
+      padding:14px 18px calc(14px + env(safe-area-inset-bottom));
+    }
+    #menu h1 { font-size:32px; letter-spacing:8px; }
+    #overlay span { font-size:24px; letter-spacing:5px; padding:14px 26px; }
+    /* lift the pad above the phone's home indicator */
+    #touchControls { bottom:calc(18px + env(safe-area-inset-bottom)); padding:0 16px; }
+  }
+  @media (max-width:380px) {
+    #dpad { grid-template-columns:repeat(3, 48px); grid-template-rows:repeat(3, 48px); }
+    .tbtn { width:48px; height:48px; }
+  }

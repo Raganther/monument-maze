@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>MONUMENT MAZE</title>
+<link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+<div id="hud">
+  <div class="chip" id="levelChip">LEVEL 1</div>
+  <div class="chip"><div id="faceDot"></div><span id="faceName">TOP</span></div>
+  <div class="chip" id="gems">&#9670; 0 / 5</div>
+  <div class="chip" id="timeChip">1:20</div>
+  <div class="chip" id="labBtn">LAB</div>
+  <div class="chip" id="menuBtn">MENU</div>
+</div>
+<div id="hint">arrows / WASD or swipe &nbsp;&middot;&nbsp; hold Q / E to turn the cube &nbsp;&middot;&nbsp; collect every &#9670;</div>
+<div id="touchControls">
+  <div id="dpad">
+    <div class="dbtn" id="dUp" data-dir="up">&#9650;</div>
+    <div class="dbtn" id="dLeft" data-dir="left">&#9664;</div>
+    <div class="dbtn dcenter"></div>
+    <div class="dbtn" id="dRight" data-dir="right">&#9654;</div>
+    <div class="dbtn" id="dDown" data-dir="down">&#9660;</div>
+  </div>
+  <div id="turnPad">
+    <div class="tbtn" id="tQ" data-turn="q">&#8634;</div>
+    <div class="tbtn" id="tE" data-turn="e">&#8635;</div>
+  </div>
+</div>
+<div id="overlay"><span id="overlayText"></span></div>
+<div id="lab">
+  <div class="labTitle">LABORATORY</div>
+  <div class="labLevel">
+    <span>LEVEL</span>
+    <div class="lvlBtns">
+      <div class="lvlBtn" id="lvlDown">&minus;</div>
+      <span id="lvlNum">1</span>
+      <div class="lvlBtn" id="lvlUp">+</div>
+    </div>
+  </div>
+  <div id="featList"></div>
+  <div class="labNote">toggling rebuilds the level</div>
+  <div class="labClose" id="labClose">CLOSE</div>
+</div>
+<div id="menu">
+  <h1>MONUMENT MAZE</h1>
+  <p class="sub">a puzzle on six planes</p>
+  <div id="modeList"></div>
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,389 @@
+import { G } from '../core/globals.js';
+import { CELL, FACES, _upY } from '../core/constants.js';
+import { cellKey, cellNeighbours, cellToPoint } from '../core/grid.js';
+import { levelComplete } from '../game/lifecycle.js';
+import { bfsFrom } from '../gen/fairness.js';
+import { placeReachGoal } from '../gen/maze.js';
+import { _planeZ } from './holes.js';
+import { bevelAmount, bevelledBox, edgeMat } from '../render/blockgeo.js';
+import { faceLift } from '../render/player.js';
+import { updateGemHUD } from '../ui/hud.js';
+import { neighborsOf } from '../world/graph.js';
+import { blocked, holes, pushBlocks, pushPads, rails } from '../world/level.js';
+
+// ---------- push-block puzzle (PUZZLE objective) ----------
+// Sokoban on the cube surface: push blocks onto target pads. State lives in
+// pushBlocks (cellKey -> mesh); pads are target cells. You win when every block
+// sits on a pad. Pushing respects the movement graph, so blocks slide across
+// cube edges just as the player does.
+G.pushGroup = null;
+
+export function clearPushPuzzle(){
+  pushBlocks.clear();
+  pushPads.clear();
+  G.pushGroup = null;
+}
+
+// find the cell you reach stepping from (fi,u,v) in world-direction D, using the
+// same edge-aware graph the player moves on. Returns [nf,nu,nv] or null.
+export function cellStep(fi, u, v, D){
+  let bestC = null, bestDot = 0.9;
+  for (const [nf, nu, nv, , dir] of cellNeighbours(fi, u, v)){
+    const d = dir.dot(D);
+    if (d > bestDot){ bestDot = d; bestC = [nf, nu, nv]; }
+  }
+  return bestC;
+}
+
+export function placePushPuzzle(){
+  clearPushPuzzle();
+  G.pushGroup = new THREE.Group();
+  G.levelGroup.add(G.pushGroup);
+  const count = Math.min(1 + (G.level >> 1), 4);   // 1-4 blocks
+
+  // SOLVABILITY: reverse-push to seed a likely-solvable layout, then VERIFY each
+  // block/pad pair with a real Sokoban state-search and retry on the rare
+  // unsolvable case. Reverse-push alone is ~88% solvable (the player can't
+  // always navigate to the pushing spot); the verify closes the gap to 100%.
+  const dist = bfsFrom(2, 2, 2);
+  const walkKeys = [...dist.keys()];
+  const usedPad = new Set(), usedBlock = new Set();
+  let placed = 0, guard = 0;
+  while (placed < count && guard++ < 200){
+    const padK = walkKeys[(Math.random()*walkKeys.length)|0];
+    if (padK === cellKey(2,2,2) || usedPad.has(padK) || usedBlock.has(padK)) continue;
+
+    // reverse-push the block away from the pad
+    let curK = padK;
+    const steps = 2 + (Math.random()*3|0);
+    for (let s = 0; s < steps; s++){
+      const [cf, cu, cv] = curK.split(',').map(Number);
+      const opts = cellNeighbours(cf, cu, cv).filter(([nf,nu,nv,mk,dir]) => {
+        const nk = cellKey(nf,nu,nv);
+        if (blocked.has(nk) || holes.has(nk) || usedBlock.has(nk) || usedPad.has(nk)
+            || nk === cellKey(2,2,2)) return false;
+        if (mk && rails.has(mk)) return false;    // don't seed a block across a wall
+        const behind = cellStep(nf, nu, nv, dir);
+        if (!behind) return false;
+        const behindK = cellKey(...behind);
+        return !blocked.has(behindK) && !holes.has(behindK);
+      });
+      if (!opts.length) break;
+      const [nf,nu,nv] = opts[(Math.random()*opts.length)|0];
+      curK = cellKey(nf,nu,nv);
+    }
+    if (curK === padK) continue;                  // didn't move off the pad
+
+    // per-block pre-filter: cheap rejection of a block that can't reach its pad
+    // even alone (treating already-placed blocks as fixed).
+    if (!pushSolvable(curK, padK, usedBlock)) continue;
+
+    usedPad.add(padK); usedBlock.add(curK);
+    placed++;
+  }
+
+  // JOINT solvability: the per-block filter misses cases where blocks wall each
+  // other in (the level-9 failures). Verify the whole set together, and if it's
+  // not solvable, drop blocks one at a time until it is — a smaller solvable
+  // puzzle beats an impossible one. Runs once (not per placement) to stay fast.
+  let blockList = [...usedBlock], padList = [...usedPad];
+  while (blockList.length > 0 && !puzzleJointSolvable(blockList, padList)){
+    blockList.pop(); padList.pop();               // drop the last-added pair
+  }
+
+  for (let i = 0; i < blockList.length; i++){
+    addPushPad(padList[i]);
+    addPushBlock(blockList[i]);
+  }
+  refreshPads();
+  updateGemHUD();
+  // guarantee at least one solvable block exists, or the puzzle is trivially won
+  if (pushBlocks.size === 0) placeReachGoal();    // fallback: a plain reach goal
+}
+
+// Multi-block JOINT solvability: can ALL blocks be pushed onto ALL pads, given
+// they interfere with each other? State = every block position + the player's
+// reachable region. This is the real test — the per-block check misses cases
+// where one block walls off the route needed to solve another.
+export function puzzleJointSolvable(blockKeys, padKeys){
+  const startP = cellKey(2, 2, 2);
+  const playerReach = (fromK, occ) => {
+    const seen = new Set([fromK]), q = [fromK];
+    for (let h = 0; h < q.length; h++){
+      const [a,b,c] = q[h].split(',').map(Number);
+      for (const [nf,nu,nv] of neighborsOf(a,b,c)){
+        const k = cellKey(nf,nu,nv);
+        if (seen.has(k) || blocked.has(k) || holes.has(k) || occ.has(k)) continue;
+        seen.add(k); q.push(k);
+      }
+    }
+    return seen;
+  };
+  const solved = bs => padKeys.every(p => bs.includes(p));
+  const seen = new Set();
+  const queue = [{ bs: blockKeys.slice().sort(), p: startP }];
+  let iter = 0;
+  const CAP = 40000;                  // bounded state expansions
+  const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const BUDGET_MS = 250;              // never hitch generation for a single check
+  while (queue.length && iter++ < CAP){
+    if ((iter & 1023) === 0){
+      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+      if (now - t0 > BUDGET_MS) return false;   // treat as unproven -> drop a block
+    }
+    const st = queue.shift();
+    if (solved(st.bs)) return true;
+    const occ = new Set(st.bs);
+    const reach = playerReach(st.p, occ);
+    const sig = st.bs.join(';') + '|' + [...reach].sort().join();
+    if (seen.has(sig)) continue;
+    seen.add(sig);
+    for (let i = 0; i < st.bs.length; i++){
+      const [bf, bu, bv] = st.bs[i].split(',').map(Number);
+      for (const [nf, nu, nv, mk, dir] of cellNeighbours(bf, bu, bv)){
+        const destK = cellKey(nf, nu, nv);
+        if (blocked.has(destK) || holes.has(destK) || occ.has(destK)) continue;
+        if (mk && rails.has(mk)) continue;
+        const behind = cellStep(bf, bu, bv, dir.clone().negate());
+        if (!behind) continue;
+        if (!reach.has(cellKey(...behind))) continue;
+        const nbs = st.bs.slice(); nbs[i] = destK; nbs.sort();
+        queue.push({ bs: nbs, p: st.bs[i] });
+      }
+    }
+  }
+  return false;                       // exhausted (or hit cap) without solving
+}
+
+// Sokoban single-block solvability: can the block at blockK be pushed to padK,
+// with the player starting at cell 0 and `fixed` cells (other blocks) immovable?
+export function pushSolvable(blockK, padK, fixed){
+  const playerReach = (fromK, blockAt) => {
+    // BFS of cells the player can walk to, with blockAt + fixed impassable
+    const seen = new Set([fromK]);
+    const q = [fromK];
+    for (let h = 0; h < q.length; h++){
+      const [a,b,c] = q[h].split(',').map(Number);
+      for (const [nf,nu,nv] of neighborsOf(a,b,c)){
+        const k = cellKey(nf,nu,nv);
+        if (seen.has(k) || blocked.has(k) || holes.has(k)
+            || k === blockAt || fixed.has(k)) continue;
+        seen.add(k); q.push(k);
+      }
+    }
+    return seen;
+  };
+  const startP = cellKey(2,2,2);
+  const seenStates = new Set();
+  const queue = [{ b: blockK, p: startP }];
+  let iter = 0;
+  while (queue.length && iter++ < 4000){
+    const st = queue.shift();
+    if (st.b === padK) return true;
+    const reach = playerReach(st.p, st.b);
+    const sig = st.b + '|' + [...reach].sort().join();
+    if (seenStates.has(sig)) continue;
+    seenStates.add(sig);
+    const [bf, bu, bv] = st.b.split(',').map(Number);
+    // for each direction the block could be pushed
+    for (const [nf, nu, nv, mk, dir] of cellNeighbours(bf, bu, bv)){
+      const destK = cellKey(nf, nu, nv);
+      if (blocked.has(destK) || holes.has(destK) || fixed.has(destK)) continue;
+      if (mk && rails.has(mk)) continue;         // can't push a block through a wall
+      // player must stand on the opposite side to push
+      const behind = cellStep(bf, bu, bv, dir.clone().negate());
+      if (!behind) continue;
+      const behindK = cellKey(...behind);
+      if (!reach.has(behindK)) continue;
+      queue.push({ b: destK, p: st.b });         // player ends where block was
+    }
+  }
+  return false;
+}
+
+export function addPushBlock(k){
+  const [fi, u, v] = k.split(',').map(Number);
+  const n = FACES[fi].n;
+  const base = cellToPoint(fi, u, v);
+  const geo = bevelledBox(G.BLOCK*0.82, G.BLOCK*0.82, G.BLOCK*0.82, bevelAmount()*1.4);
+  const mat = new THREE.MeshLambertMaterial({ color:0xc8794a });   // warm clay, stands out
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  mesh.position.copy(base).addScaledVector(n, CELL*0.41 + faceLift(fi));
+  mesh.quaternion.setFromUnitVectors(_upY, n);
+  mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(geo), edgeMat));
+  G.pushGroup.add(mesh);
+  pushBlocks.set(k, { mesh });
+}
+
+export function addPushPad(k){
+  const [fi, u, v] = k.split(',').map(Number);
+  const n = FACES[fi].n;
+  const base = cellToPoint(fi, u, v);
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(CELL*0.24, CELL*0.38, 20),
+    new THREE.MeshBasicMaterial({ color:0xe0a03a, side:THREE.DoubleSide,
+      transparent:true, opacity:0.85 }));
+  ring.position.copy(base).addScaledVector(n, 0.02 + faceLift(fi));
+  ring.quaternion.setFromUnitVectors(_planeZ, n);
+  G.pushGroup.add(ring);
+  pushPads.set(k, ring);
+}
+
+// try to push the block at cell bk in world-direction D. Returns the new block
+// cell if it moved, else null. Called when the player steps into a block.
+// scratch vectors/quaternions for push-block animation
+export const _pbTmp = new THREE.Vector3();
+export const _pbQ = new THREE.Quaternion();
+export const _pbTmp2 = new THREE.Vector3();
+export const _pbQ2 = new THREE.Quaternion();
+export function tryPush(bk, playerCellK, D){
+  try { return tryPushInner(bk, playerCellK, D); }
+  catch(err){ console.error('push error:', err); return null; }
+}
+export function tryPushInner(bk, playerCellK, D){
+  const [bfi, bu, bv] = bk.split(',').map(Number);
+  // The push direction D is expressed in the PLAYER's face frame. When the block
+  // sits on a different face (across an edge), D isn't a valid tangent of the
+  // block's face, so we can't use it directly. Instead we pick the block's exit
+  // that continues the push line: the neighbour cell the player is shoving toward
+  // (furthest from the player along the shove line).
+  const playerPos = playerCellK ? cellToPoint(...playerCellK.split(',').map(Number)) : null;
+  let dest = null, destDir = null, destSeam = null;
+  if (playerPos){
+    const bPos = cellToPoint(bfi, bu, bv);
+    const shove = bPos.clone().sub(playerPos);   // world heading player->block
+    let best = -Infinity;
+    for (const [nf, nu, nv, mk, dir] of cellNeighbours(bfi, bu, bv)){
+      const nPos = cellToPoint(nf, nu, nv);
+      const away = nPos.clone().sub(playerPos).dot(shove);
+      const score = dir.dot(shove) + away * 0.001;
+      if (score > best){ best = score; dest = [nf, nu, nv]; destDir = dir.clone(); destSeam = mk; }
+    }
+  } else {
+    dest = cellStep(bfi, bu, bv, D);
+    if (dest){
+      for (const [nf, nu, nv, mk, dir] of cellNeighbours(bfi, bu, bv))
+        if (nf === dest[0] && nu === dest[1] && nv === dest[2]){ destDir = dir.clone(); destSeam = mk; break; }
+    }
+  }
+  if (!dest || !destDir) return null;            // block at edge with nowhere to go
+  const dk = cellKey(...dest);
+  // a wall (rail) on the seam blocks the block just as it blocks the player —
+  // the block can't be shoved through a wall it can't pass.
+  if (destSeam && rails.has(destSeam)) return null;
+  if (blocked.has(dk) || holes.has(dk) || pushBlocks.has(dk)) return null;
+  const rec = pushBlocks.get(bk);
+  if (rec.anim) return null;                      // already mid-push, ignore
+  const [nfi, nu, nv] = dest;
+  const sameFace = (nfi === bfi);
+  // the block's move direction on ITS OWN face, used for the flip axis
+  const bD = destDir;
+
+  // update the LOGICAL position immediately so chained pushes and the win check
+  // stay correct; the mesh catches up via the animation below.
+  pushBlocks.delete(bk);
+  pushBlocks.set(dk, rec);
+
+  const fromPos = rec.mesh.position.clone();
+  const fromQ = rec.mesh.quaternion.clone();
+  const nN = FACES[nfi].n;
+  const toPos = cellToPoint(nfi, nu, nv).addScaledVector(nN, CELL*0.41 + faceLift(nfi));
+  const toQ = new THREE.Quaternion().setFromUnitVectors(_upY, nN);
+
+  if (sameFace){
+    rec.anim = { kind:'slide', t:0, dur:150, fromPos, toPos };
+  } else {
+    const oldN = FACES[bfi].n;
+    let axis = new THREE.Vector3().crossVectors(oldN, bD);
+    if (axis.lengthSq() < 1e-9){
+      // degenerate — a zero axis becomes NaN and crashes WebGL. Fall back to slide.
+      rec.anim = { kind:'slide', t:0, dur:180, fromPos, toPos };
+      refreshPads(); updateGemHUD();
+      return dk;
+    }
+    axis.normalize();
+    const oldCentre = cellToPoint(bfi, bu, bv);
+    const edgeMid = oldCentre.clone()
+      .addScaledVector(bD, CELL/2)
+      .addScaledVector(oldN, -CELL/2);
+    const testEnd = (ang) => _pbTmp2.copy(fromPos).sub(edgeMid)
+      .applyQuaternion(_pbQ2.setFromAxisAngle(axis, ang)).add(edgeMid);
+    const half = Math.PI/2;
+    const dPos = testEnd(half).distanceTo(toPos);
+    const dNeg = testEnd(-half).distanceTo(toPos);
+    const sign = dPos <= dNeg ? 1 : -1;
+    const outN = oldN.clone().add(nN).normalize();    // bulge out over the edge
+    rec.anim = { kind:'flip', t:0, dur:220, fromPos, fromQ, toPos, toQ, axis, edgeMid, sign, outN };
+  }
+
+  refreshPads();
+  updateGemHUD();
+  return dk;
+}
+
+// advance push-block animations; called each frame
+export function tickPushBlocks(dt){
+  try {
+  for (const rec of pushBlocks.values()){
+    const a = rec.anim;
+    if (!a) continue;
+    a.t += dt;
+    const raw = Math.min(1, a.t / a.dur);
+    const e = raw < 0.5 ? 2*raw*raw : 1 - Math.pow(-2*raw+2, 2)/2;   // ease in-out
+    if (a.kind === 'slide'){
+      rec.mesh.position.lerpVectors(a.fromPos, a.toPos, e);
+    } else {
+      // tumble over the edge: interpolate position along an arc that bulges out
+      // past the edge (so it swings over, not through the cube), while rotating
+      // 90° for the roll. Exact landing is snapped at raw>=1, so the arc only
+      // needs to read as a believable tumble.
+      _pbTmp.lerpVectors(a.fromPos, a.toPos, e);
+      // lift the midpoint outward along the average of the two face normals
+      const bulge = Math.sin(e * Math.PI) * CELL * 0.33;
+      _pbTmp.addScaledVector(a.outN, bulge);
+      rec.mesh.position.copy(_pbTmp);
+      _pbQ.setFromAxisAngle(a.axis, e * (Math.PI/2) * a.sign);
+      rec.mesh.quaternion.copy(_pbQ).multiply(a.fromQ);
+    }
+    // NaN guard: a non-finite position/quaternion crashes the WebGL renderer
+    const _p = rec.mesh.position;
+    if (!Number.isFinite(_p.x) || !Number.isFinite(_p.y) || !Number.isFinite(_p.z)){
+      rec.mesh.position.copy(a.toPos);
+      if (a.toQ) rec.mesh.quaternion.copy(a.toQ);
+      rec.anim = null;
+      continue;
+    }
+    if (raw >= 1){
+      rec.mesh.position.copy(a.toPos);
+      if (a.toQ) rec.mesh.quaternion.copy(a.toQ);   // flips reorient; slides don't
+      rec.anim = null;
+      refreshPads();
+      if (puzzleSolved()) levelComplete();
+    }
+  }
+  } catch(err){
+    console.error('push animation error:', err);
+    // never let an animation glitch spam or crash: snap all to their targets
+    for (const rec of pushBlocks.values()) if (rec.anim){
+      rec.mesh.position.copy(rec.anim.toPos);
+      if (rec.anim.toQ) rec.mesh.quaternion.copy(rec.anim.toQ);
+      rec.anim = null;
+    }
+  }
+}
+
+// light up pads that have a block on them
+export function refreshPads(){
+  for (const [pk, ring] of pushPads){
+    const on = pushBlocks.has(pk);
+    ring.material.color.setHex(on ? 0x66c7a5 : 0xe0a03a);
+    ring.material.opacity = on ? 1.0 : 0.85;
+  }
+}
+
+export function puzzleSolved(){
+  for (const pk of pushPads.keys()) if (!pushBlocks.has(pk)) return false;
+  return pushPads.size > 0;
+}
+

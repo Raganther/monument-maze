@@ -1,0 +1,43 @@
+// Entry point. Modules are imported in the same order their code appeared in
+// the original single-file build, so top-level side effects (scene setup, mesh
+// construction, DOM wiring) still run in exactly the order they used to.
+import './config/modes.js';
+import './config/features.js';
+import './core/constants.js';
+import './core/rng.js';
+import './render/scene.js';
+import './render/cube.js';
+import './core/grid.js';
+import './render/player.js';
+import './world/level.js';
+import './render/blockgeo.js';
+import './render/monuments.js';
+import './render/masonry.js';
+import './render/rails.js';
+import './render/path.js';
+import './world/graph.js';
+import './mechanics/towers.js';
+import './mechanics/rails.js';
+import './mechanics/holes.js';
+import './mechanics/bridges.js';
+import './mechanics/oneways.js';
+import './mechanics/portals.js';
+import './mechanics/gems.js';
+import './mechanics/keystone.js';
+import './mechanics/pushblocks.js';
+import './config/wiring.js';
+import './gen/gauntlet.js';
+import './gen/maze.js';
+import './render/seethrough.js';
+import './render/trail.js';
+import './gen/fairness.js';
+import './ui/hud.js';
+import './audio/sfx.js';
+import './audio/drone.js';
+import './game/lifecycle.js';
+import './ui/menu.js';
+import './ui/lab.js';
+import './game/movement.js';
+import './game/view.js';
+import './game/input.js';
+import './game/loop.js';
