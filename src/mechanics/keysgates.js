@@ -7,8 +7,8 @@
 import { G } from '../core/globals.js';
 import { CELL, FACES, _upY } from '../core/constants.js';
 import { cellKey, cellToPoint } from '../core/grid.js';
-import { SOLVED, verifyLevel } from '../gen/verify.js';
-import { reachableCells } from '../core/solver.js';
+import { SOLVED, deadline, verifyLevel } from '../gen/verify.js';
+import { reachablePositions } from '../core/solver.js';
 import { RULES } from './rules/index.js';
 import { bevelAmount, bevelledBox, edgeMat } from '../render/blockgeo.js';
 import { faceLift } from '../render/player.js';
@@ -31,14 +31,21 @@ export function generateKeysGates(count){
   group = new THREE.Group();
   G.levelGroup.add(group);
 
+  // Candidate cells are gathered ONCE, and from the cheap position-only walk.
+  // Calling the full joint reachability per attempt (4 colours x 14 tries) put
+  // buildLevel() at ~15s on a busy level 15 - long enough that toggling
+  // anything in the LAB felt like the game had hung. Placing a key or a gate
+  // never makes a cell reachable that was not reachable before, so one
+  // snapshot is a sound pool; the solver still re-proves the real board after
+  // every pair.
+  const pool = [...reachablePositions(RULES)].filter(k => k !== cellKey(2,2,2));
+
+  const outOfTime = deadline(1500);
   const staged = [];
-  for (let colour = 0; colour < Math.min(count, KEY_COLORS.length); colour++){
+  for (let colour = 0; colour < Math.min(count, KEY_COLORS.length) && !outOfTime(); colour++){
     let placed = false;
-    for (let attempt = 0; attempt < 14 && !placed; attempt++){
-      // Candidates are drawn from cells the player can currently reach, so a
-      // pair is at least plausible before the solver is asked about it.
-      const cells = [...reachableCells(RULES)].filter(
-        k => k !== cellKey(2,2,2) && !keys.has(k) && !gates.has(k));
+    for (let attempt = 0; attempt < 14 && !placed && !outOfTime(); attempt++){
+      const cells = pool.filter(k => !keys.has(k) && !gates.has(k));
       if (cells.length < 4) return finish(staged);
 
       const keyK  = cells[(Math.random()*cells.length)|0];

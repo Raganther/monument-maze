@@ -15,7 +15,23 @@ export { SOLVED, UNSOLVABLE, UNKNOWN } from '../core/solver.js';
 
 // Is the board, exactly as it currently stands, winnable?
 export function verifyLevel(opts = {}){
-  return solve(RULES, { budgetMs: 700, maxStates: 120000, ...opts });
+  return solve(RULES, { budgetMs: 400, maxStates: 80000, ...opts });
+}
+
+// A wall-clock budget for a whole generation step.
+//
+// Proving one candidate is cheap, but a generator that proposes a few dozen of
+// them can still add up: four movable blocks at level 15 is a genuinely hard
+// Sokoban instance, and re-proving it after every candidate pushed buildLevel()
+// past fifteen seconds - long enough that toggling something in the LAB feels
+// like the game has hung.
+//
+// So generators get a deadline and keep whatever they proved before it passed.
+// The trade is fewer blocks or fewer gates on a crowded board, never a level
+// that was not verified.
+export function deadline(ms){
+  const end = (typeof performance !== 'undefined' ? performance.now() : Date.now()) + ms;
+  return () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) > end;
 }
 
 // Try `propose()` until the board it leaves behind verifies.

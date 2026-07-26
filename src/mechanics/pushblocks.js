@@ -4,7 +4,7 @@ import { cellKey, cellNeighbours, cellToPoint } from '../core/grid.js';
 import { levelComplete } from '../game/lifecycle.js';
 import { bfsFrom } from '../gen/fairness.js';
 import { placeReachGoal } from '../gen/maze.js';
-import { SOLVED, verifyLevel } from '../gen/verify.js';
+import { SOLVED, deadline, verifyLevel } from '../gen/verify.js';
 import { _planeZ } from './holes.js';
 import { bevelAmount, bevelledBox, edgeMat } from '../render/blockgeo.js';
 import { faceLift } from '../render/player.js';
@@ -83,10 +83,11 @@ export function placePushPuzzle(){
   const walkKeys = [...bfsFrom(2, 2, 2).keys()];
   const blocks = [], pads = [];
   const usedBlock = new Set(), usedPad = new Set();
+  const outOfTime = deadline(2200);
 
-  for (let n = 0; n < count; n++){
+  for (let n = 0; n < count && !outOfTime(); n++){
     let added = false;
-    for (let attempt = 0; attempt < 12 && !added; attempt++){
+    for (let attempt = 0; attempt < 12 && !added && !outOfTime(); attempt++){
       const pair = proposeOne(walkKeys, usedBlock, usedPad);
       if (!pair) continue;
       pushBlocks.set(pair.block, { mesh: null });

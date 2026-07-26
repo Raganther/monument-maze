@@ -169,6 +169,33 @@ function canTour(active, S0, inertGoals){
   return true;
 }
 
+// Cells the player can walk to WITHOUT changing the board.
+//
+// Generators mostly want "somewhere the player can stand" as a candidate pool,
+// and for that the full joint search is enormous overkill: reachableCells()
+// keys on the whole state, so with four movable blocks it explores the entire
+// Sokoban space just to list floor tiles. This walks positions only, skipping
+// any transition that would shift a block, which is both far cheaper and the
+// more conservative pool - every cell it returns is reachable with the board
+// exactly as it stands.
+export function reachablePositions(rules, start = '2,2,2'){
+  const active = rules.filter(r => !r.enabled || r.enabled());
+  const S0 = initialState(active, start);
+  const boardSlices = active.filter(r => r.key && !r.movementInert);
+  const sig = S => boardSlices.map(r => r.key(S)).join('|');
+  const base = sig(S0);
+
+  const seen = new Set([S0.at]);
+  const queue = [S0.at];
+  for (let h = 0; h < queue.length; h++){
+    for (const nxt of successors({ at: queue[h], m: S0.m }, active)){
+      if (sig(nxt) !== base || seen.has(nxt.at)) continue;
+      seen.add(nxt.at); queue.push(nxt.at);
+    }
+  }
+  return seen;
+}
+
 // Which cells can the player ever stand on? Used by generators that want to
 // place something reachable without caring about the objective.
 export function reachableCells(rules, start = '2,2,2'){
