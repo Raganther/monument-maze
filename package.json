@@ -1,0 +1,14 @@
+{
+  "name": "monument-maze",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A puzzle on six planes",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "verify": "node tools/verify.mjs"
+  },
+  "imports": {
+    "#three": "./vendor/three.module.js"
+  }
+}

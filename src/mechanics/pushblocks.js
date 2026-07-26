@@ -4,11 +4,11 @@ import { cellKey, cellNeighbours, cellToPoint } from '../core/grid.js';
 import { levelComplete } from '../game/lifecycle.js';
 import { bfsFrom } from '../gen/fairness.js';
 import { placeReachGoal } from '../gen/maze.js';
+import { proposeUntilSolvable } from '../gen/verify.js';
 import { _planeZ } from './holes.js';
 import { bevelAmount, bevelledBox, edgeMat } from '../render/blockgeo.js';
 import { faceLift } from '../render/player.js';
 import { updateGemHUD } from '../ui/hud.js';
-import { neighborsOf } from '../world/graph.js';
 import { blocked, holes, pushBlocks, pushPads, rails } from '../world/level.js';
 
 // ---------- push-block puzzle (PUZZLE objective) ----------
@@ -35,16 +35,11 @@ export function cellStep(fi, u, v, D){
   return bestC;
 }
 
-export function placePushPuzzle(){
-  clearPushPuzzle();
-  G.pushGroup = new THREE.Group();
-  G.levelGroup.add(G.pushGroup);
-  const count = Math.min(1 + (G.level >> 1), 4);   // 1-4 blocks
-
-  // SOLVABILITY: reverse-push to seed a likely-solvable layout, then VERIFY each
-  // block/pad pair with a real Sokoban state-search and retry on the rare
-  // unsolvable case. Reverse-push alone is ~88% solvable (the player can't
-  // always navigate to the pushing spot); the verify closes the gap to 100%.
+// Propose one block/pad set by reverse-pushing blocks away from their pads.
+// This is only a heuristic for a *likely* layout - reverse-pushing ignores
+// whether the player can actually get behind the block to shove it back, which
+// is why the result must always be proven before it is used.
+function proposePairs(count){
   const dist = bfsFrom(2, 2, 2);
   const walkKeys = [...dist.keys()];
   const usedPad = new Set(), usedBlock = new Set();
@@ -53,7 +48,6 @@ export function placePushPuzzle(){
     const padK = walkKeys[(Math.random()*walkKeys.length)|0];
     if (padK === cellKey(2,2,2) || usedPad.has(padK) || usedBlock.has(padK)) continue;
 
-    // reverse-push the block away from the pad
     let curK = padK;
     const steps = 2 + (Math.random()*3|0);
     for (let s = 0; s < steps; s++){
@@ -73,133 +67,55 @@ export function placePushPuzzle(){
       curK = cellKey(nf,nu,nv);
     }
     if (curK === padK) continue;                  // didn't move off the pad
-
-    // per-block pre-filter: cheap rejection of a block that can't reach its pad
-    // even alone (treating already-placed blocks as fixed).
-    if (!pushSolvable(curK, padK, usedBlock)) continue;
-
     usedPad.add(padK); usedBlock.add(curK);
     placed++;
   }
+  return { blocks: [...usedBlock], pads: [...usedPad] };
+}
 
-  // JOINT solvability: the per-block filter misses cases where blocks wall each
-  // other in (the level-9 failures). Verify the whole set together, and if it's
-  // not solvable, drop blocks one at a time until it is — a smaller solvable
-  // puzzle beats an impossible one. Runs once (not per placement) to stay fast.
-  let blockList = [...usedBlock], padList = [...usedPad];
-  while (blockList.length > 0 && !puzzleJointSolvable(blockList, padList)){
-    blockList.pop(); padList.pop();               // drop the last-added pair
+export function placePushPuzzle(){
+  clearPushPuzzle();
+  G.pushGroup = new THREE.Group();
+  G.levelGroup.add(G.pushGroup);
+  const count = Math.min(1 + (G.level >> 1), 4);   // 1-4 blocks
+
+  // Prove the whole board, not each block on its own.
+  //
+  // The pairs are staged as bare keys first, because the rules read
+  // pushBlocks/pushPads directly and a rejected proposal must cost nothing -
+  // meshes are only built once a set has actually been solved. Fewer blocks are
+  // tried before giving up entirely, since a smaller proven puzzle is better
+  // than none; but unlike the old code, dropping a block is followed by another
+  // proof rather than by shipping the remainder unchecked.
+  let accepted = null;
+  for (let n = count; n >= 1 && !accepted; n--){
+    accepted = proposeUntilSolvable(
+      () => {
+        const { blocks, pads } = proposePairs(n);
+        if (blocks.length < n) return false;
+        for (const b of blocks) pushBlocks.set(b, { mesh: null });
+        for (const p of pads) pushPads.set(p, null);
+        return { blocks, pads };
+      },
+      () => { pushBlocks.clear(); pushPads.clear(); },
+      n === count ? 10 : 5,
+    );
   }
 
-  for (let i = 0; i < blockList.length; i++){
-    addPushPad(padList[i]);
-    addPushBlock(blockList[i]);
+  pushBlocks.clear(); pushPads.clear();
+  if (accepted){
+    for (let i = 0; i < accepted.blocks.length; i++){
+      addPushPad(accepted.pads[i]);
+      addPushBlock(accepted.blocks[i]);
+    }
   }
   refreshPads();
   updateGemHUD();
-  // guarantee at least one solvable block exists, or the puzzle is trivially won
-  if (pushBlocks.size === 0) placeReachGoal();    // fallback: a plain reach goal
+  // nothing provable on this board - fall back to a plain reach goal rather
+  // than leaving the player a puzzle that cannot be finished
+  if (pushBlocks.size === 0) placeReachGoal();
 }
 
-// Multi-block JOINT solvability: can ALL blocks be pushed onto ALL pads, given
-// they interfere with each other? State = every block position + the player's
-// reachable region. This is the real test — the per-block check misses cases
-// where one block walls off the route needed to solve another.
-export function puzzleJointSolvable(blockKeys, padKeys){
-  const startP = cellKey(2, 2, 2);
-  const playerReach = (fromK, occ) => {
-    const seen = new Set([fromK]), q = [fromK];
-    for (let h = 0; h < q.length; h++){
-      const [a,b,c] = q[h].split(',').map(Number);
-      for (const [nf,nu,nv] of neighborsOf(a,b,c)){
-        const k = cellKey(nf,nu,nv);
-        if (seen.has(k) || blocked.has(k) || holes.has(k) || occ.has(k)) continue;
-        seen.add(k); q.push(k);
-      }
-    }
-    return seen;
-  };
-  const solved = bs => padKeys.every(p => bs.includes(p));
-  const seen = new Set();
-  const queue = [{ bs: blockKeys.slice().sort(), p: startP }];
-  let iter = 0;
-  const CAP = 40000;                  // bounded state expansions
-  const t0 = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-  const BUDGET_MS = 250;              // never hitch generation for a single check
-  while (queue.length && iter++ < CAP){
-    if ((iter & 1023) === 0){
-      const now = (typeof performance !== 'undefined' ? performance.now() : Date.now());
-      if (now - t0 > BUDGET_MS) return false;   // treat as unproven -> drop a block
-    }
-    const st = queue.shift();
-    if (solved(st.bs)) return true;
-    const occ = new Set(st.bs);
-    const reach = playerReach(st.p, occ);
-    const sig = st.bs.join(';') + '|' + [...reach].sort().join();
-    if (seen.has(sig)) continue;
-    seen.add(sig);
-    for (let i = 0; i < st.bs.length; i++){
-      const [bf, bu, bv] = st.bs[i].split(',').map(Number);
-      for (const [nf, nu, nv, mk, dir] of cellNeighbours(bf, bu, bv)){
-        const destK = cellKey(nf, nu, nv);
-        if (blocked.has(destK) || holes.has(destK) || occ.has(destK)) continue;
-        if (mk && rails.has(mk)) continue;
-        const behind = cellStep(bf, bu, bv, dir.clone().negate());
-        if (!behind) continue;
-        if (!reach.has(cellKey(...behind))) continue;
-        const nbs = st.bs.slice(); nbs[i] = destK; nbs.sort();
-        queue.push({ bs: nbs, p: st.bs[i] });
-      }
-    }
-  }
-  return false;                       // exhausted (or hit cap) without solving
-}
-
-// Sokoban single-block solvability: can the block at blockK be pushed to padK,
-// with the player starting at cell 0 and `fixed` cells (other blocks) immovable?
-export function pushSolvable(blockK, padK, fixed){
-  const playerReach = (fromK, blockAt) => {
-    // BFS of cells the player can walk to, with blockAt + fixed impassable
-    const seen = new Set([fromK]);
-    const q = [fromK];
-    for (let h = 0; h < q.length; h++){
-      const [a,b,c] = q[h].split(',').map(Number);
-      for (const [nf,nu,nv] of neighborsOf(a,b,c)){
-        const k = cellKey(nf,nu,nv);
-        if (seen.has(k) || blocked.has(k) || holes.has(k)
-            || k === blockAt || fixed.has(k)) continue;
-        seen.add(k); q.push(k);
-      }
-    }
-    return seen;
-  };
-  const startP = cellKey(2,2,2);
-  const seenStates = new Set();
-  const queue = [{ b: blockK, p: startP }];
-  let iter = 0;
-  while (queue.length && iter++ < 4000){
-    const st = queue.shift();
-    if (st.b === padK) return true;
-    const reach = playerReach(st.p, st.b);
-    const sig = st.b + '|' + [...reach].sort().join();
-    if (seenStates.has(sig)) continue;
-    seenStates.add(sig);
-    const [bf, bu, bv] = st.b.split(',').map(Number);
-    // for each direction the block could be pushed
-    for (const [nf, nu, nv, mk, dir] of cellNeighbours(bf, bu, bv)){
-      const destK = cellKey(nf, nu, nv);
-      if (blocked.has(destK) || holes.has(destK) || fixed.has(destK)) continue;
-      if (mk && rails.has(mk)) continue;         // can't push a block through a wall
-      // player must stand on the opposite side to push
-      const behind = cellStep(bf, bu, bv, dir.clone().negate());
-      if (!behind) continue;
-      const behindK = cellKey(...behind);
-      if (!reach.has(behindK)) continue;
-      queue.push({ b: destK, p: st.b });         // player ends where block was
-    }
-  }
-  return false;
-}
 
 export function addPushBlock(k){
   const [fi, u, v] = k.split(',').map(Number);
