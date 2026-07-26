@@ -14,13 +14,14 @@ import oneways   from './oneways.js';
 import holes     from './holes.js';
 import portals   from './portals.js';
 import pushblocks from './pushblocks.js';
+import keysgates from './keysgates.js';
 import gems      from './gems.js';
 import goalcell  from './goalcell.js';
 import keystone  from './keystone.js';
 
 export const RULES = [
   // movement constraints
-  towers, rails, oneways, holes,
+  towers, rails, oneways, holes, keysgates,
   // things that change the board
   pushblocks, portals,
   // objectives

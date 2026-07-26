@@ -70,6 +70,11 @@ export const FEATURES = {
     name:'ONE-WAY TILES', desc:'arrows you can only cross one way — commitment and routing',
     on:true,
   },
+  keysgates: {
+    name:'KEYS & GATES', desc:'coloured keys open the gates that match them',
+    on:false,
+    slider: { min:1, max:4, step:1, value:2, unit:'' },
+  },
   keystone: {
     name:'KEYSTONE', desc:'collect the gems, then journey to the awakened monument to finish',
     on:false,

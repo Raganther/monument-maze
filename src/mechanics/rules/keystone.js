@@ -11,5 +11,7 @@ import { featureOn } from '../../config/features.js';
 export default {
   id: 'keystone',
   enabled(){ return featureOn('keystone') && !!G.keystoneCell; },
+  movementInert: true,
+  targets(){ return [G.keystoneCell]; },
   goal(S){ return S.at === G.keystoneCell; },
 };

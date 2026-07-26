@@ -32,9 +32,10 @@ G.level = level;
 buildLevel();
 
 console.log('feature set:', Object.keys(FEATURES).filter(k => FEATURES[k].on).join(', '));
-console.log('board: blocked=%d rails=%d oneways=%d portals=%d holes=%d gems=%d blocks=%d pads=%d',
+console.log('board: blocked=%d rails=%d oneways=%d portals=%d holes=%d gems=%d blocks=%d pads=%d keys=%d gates=%d',
   level_.blocked.size, level_.rails.size, level_.oneways.size, level_.portals.size,
-  level_.holes.size, level_.gems.length, level_.pushBlocks.size, level_.pushPads.size);
+  level_.holes.size, level_.gems.length, level_.pushBlocks.size, level_.pushPads.size,
+  level_.keys.size, level_.gates.size);
 
 const t0 = Date.now();
 const r = solve(RULES);

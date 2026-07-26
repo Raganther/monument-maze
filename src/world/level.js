@@ -22,3 +22,5 @@ export const portalFX = new Map();      // cellKey -> { lightMat, light, flare }
 export const gems = [];
 export const pushBlocks = new Map();     // current cellKey -> { mesh }
 export const pushPads = new Map();       // pad cellKey -> mesh
+export const keys = new Map();           // cellKey -> colour index
+export const gates = new Map();          // cellKey -> colour index that opens it

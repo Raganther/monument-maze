@@ -26,6 +26,9 @@ function reindex(){
 export default {
   id: 'gems',
   enabled(){ return gems.length > 0; },
+  // picking a gem up changes nothing about where the player may walk
+  movementInert: true,
+  targets(){ reindex(); return [...index.keys()]; },
   initState(){ reindex(); return 0; },
   onEnter(cellK, S){
     const bit = index.get(cellK);

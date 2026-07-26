@@ -26,7 +26,7 @@ const L = await import('../src/world/level.js');
 // The gameplay mechanics worth combining. Purely cosmetic features (palettes,
 // bevels, audio) cannot affect solvability, so sweeping them would only burn
 // time - they are left at their defaults.
-const GAMEPLAY = ['towers', 'rails', 'holes', 'bridges', 'portals', 'oneways', 'keystone'];
+const GAMEPLAY = ['towers', 'rails', 'holes', 'bridges', 'portals', 'oneways', 'keystone', 'keysgates'];
 const BASE = Object.fromEntries(Object.keys(FEATURES).map(k => [k, FEATURES[k].on]));
 
 const CASES = [];
@@ -35,6 +35,8 @@ for (const mode of ['collect', 'reach', 'puzzle']){
   for (const f of GAMEPLAY) CASES.push({ mode, on: [f], label: f });
   CASES.push({ mode, on: ['oneways', 'portals'], label: 'oneways+portals' });
   CASES.push({ mode, on: ['oneways', 'rails', 'holes'], label: 'oneways+rails+holes' });
+  CASES.push({ mode, on: ['keysgates', 'oneways', 'rails'], label: 'keys+oneways+rails' });
+  CASES.push({ mode, on: ['keysgates', 'keystone'], label: 'keys+keystone' });
   CASES.push({ mode, on: GAMEPLAY, label: 'everything' });
 }
 

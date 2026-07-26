@@ -11,6 +11,7 @@ import { spawnGems } from '../mechanics/gems.js';
 import { placeKeystone } from '../mechanics/keystone.js';
 import { drawOneways } from '../mechanics/oneways.js';
 import { clearPushPuzzle, placePushPuzzle } from '../mechanics/pushblocks.js';
+import { clearKeysGates, generateKeysGates } from '../mechanics/keysgates.js';
 import { updateFaceTextures } from '../render/cube.js';
 import { Nf, P, PSIZE, faceLift, placePlayer, player, playerTargetQuat } from '../render/player.js';
 import { CAM_DIR, applyCamera, applyShadows, world } from '../render/scene.js';
@@ -39,6 +40,7 @@ export function buildLevel(){
   oneways.clear(); onewayMeshes.length = 0;
   G.gauntletSpine = null; gauntletWallSeams.clear(); wallRep.clear();
   clearPushPuzzle();
+  clearKeysGates();
   portals.clear(); portalList.length = 0; portalFX.clear();
   gems.length = 0; G.gemCount = 0;
   monumentCells.length = 0;
@@ -71,6 +73,14 @@ export function buildLevel(){
     G.gemsTotal = 0;
     placePushPuzzle();
   }
+
+  // Keys and gates go on AFTER the objective, not in the feature pass above,
+  // because each pair is kept only if the board still solves - and there is
+  // nothing to solve for until the objective exists. Placing a gate earlier
+  // would be proving a level with no win condition.
+  if (featureOn('keysgates'))
+    generateKeysGates(FEATURES.keysgates.slider.value);
+
   updateFaceTextures();   // cut any hole openings out of the face surfaces
   G.timeLeft = fairTimeLimit();
 

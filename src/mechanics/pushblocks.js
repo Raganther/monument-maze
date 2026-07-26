@@ -4,7 +4,7 @@ import { cellKey, cellNeighbours, cellToPoint } from '../core/grid.js';
 import { levelComplete } from '../game/lifecycle.js';
 import { bfsFrom } from '../gen/fairness.js';
 import { placeReachGoal } from '../gen/maze.js';
-import { proposeUntilSolvable } from '../gen/verify.js';
+import { SOLVED, verifyLevel } from '../gen/verify.js';
 import { _planeZ } from './holes.js';
 import { bevelAmount, bevelledBox, edgeMat } from '../render/blockgeo.js';
 import { faceLift } from '../render/player.js';
@@ -35,42 +35,34 @@ export function cellStep(fi, u, v, D){
   return bestC;
 }
 
-// Propose one block/pad set by reverse-pushing blocks away from their pads.
+// Propose ONE block/pad pair by reverse-pushing a block away from its pad.
 // This is only a heuristic for a *likely* layout - reverse-pushing ignores
 // whether the player can actually get behind the block to shove it back, which
 // is why the result must always be proven before it is used.
-function proposePairs(count){
-  const dist = bfsFrom(2, 2, 2);
-  const walkKeys = [...dist.keys()];
-  const usedPad = new Set(), usedBlock = new Set();
-  let placed = 0, guard = 0;
-  while (placed < count && guard++ < 200){
-    const padK = walkKeys[(Math.random()*walkKeys.length)|0];
-    if (padK === cellKey(2,2,2) || usedPad.has(padK) || usedBlock.has(padK)) continue;
+function proposeOne(walkKeys, usedBlock, usedPad){
+  const padK = walkKeys[(Math.random()*walkKeys.length)|0];
+  if (padK === cellKey(2,2,2) || usedPad.has(padK) || usedBlock.has(padK)) return null;
 
-    let curK = padK;
-    const steps = 2 + (Math.random()*3|0);
-    for (let s = 0; s < steps; s++){
-      const [cf, cu, cv] = curK.split(',').map(Number);
-      const opts = cellNeighbours(cf, cu, cv).filter(([nf,nu,nv,mk,dir]) => {
-        const nk = cellKey(nf,nu,nv);
-        if (blocked.has(nk) || holes.has(nk) || usedBlock.has(nk) || usedPad.has(nk)
-            || nk === cellKey(2,2,2)) return false;
-        if (mk && rails.has(mk)) return false;    // don't seed a block across a wall
-        const behind = cellStep(nf, nu, nv, dir);
-        if (!behind) return false;
-        const behindK = cellKey(...behind);
-        return !blocked.has(behindK) && !holes.has(behindK);
-      });
-      if (!opts.length) break;
-      const [nf,nu,nv] = opts[(Math.random()*opts.length)|0];
-      curK = cellKey(nf,nu,nv);
-    }
-    if (curK === padK) continue;                  // didn't move off the pad
-    usedPad.add(padK); usedBlock.add(curK);
-    placed++;
+  let curK = padK;
+  const steps = 2 + (Math.random()*3|0);
+  for (let s = 0; s < steps; s++){
+    const [cf, cu, cv] = curK.split(',').map(Number);
+    const opts = cellNeighbours(cf, cu, cv).filter(([nf,nu,nv,mk,dir]) => {
+      const nk = cellKey(nf,nu,nv);
+      if (blocked.has(nk) || holes.has(nk) || usedBlock.has(nk) || usedPad.has(nk)
+          || nk === cellKey(2,2,2)) return false;
+      if (mk && rails.has(mk)) return false;    // don't seed a block across a wall
+      const behind = cellStep(nf, nu, nv, dir);
+      if (!behind) return false;
+      const behindK = cellKey(...behind);
+      return !blocked.has(behindK) && !holes.has(behindK);
+    });
+    if (!opts.length) break;
+    const [nf,nu,nv] = opts[(Math.random()*opts.length)|0];
+    curK = cellKey(nf,nu,nv);
   }
-  return { blocks: [...usedBlock], pads: [...usedPad] };
+  if (curK === padK) return null;                 // didn't move off the pad
+  return { block: curK, pad: padK };
 }
 
 export function placePushPuzzle(){
@@ -79,35 +71,42 @@ export function placePushPuzzle(){
   G.levelGroup.add(G.pushGroup);
   const count = Math.min(1 + (G.level >> 1), 4);   // 1-4 blocks
 
-  // Prove the whole board, not each block on its own.
+  // Grow the puzzle one proven pair at a time.
   //
-  // The pairs are staged as bare keys first, because the rules read
-  // pushBlocks/pushPads directly and a rejected proposal must cost nothing -
-  // meshes are only built once a set has actually been solved. Fewer blocks are
-  // tried before giving up entirely, since a smaller proven puzzle is better
-  // than none; but unlike the old code, dropping a block is followed by another
-  // proof rather than by shipping the remainder unchecked.
-  let accepted = null;
-  for (let n = count; n >= 1 && !accepted; n--){
-    accepted = proposeUntilSolvable(
-      () => {
-        const { blocks, pads } = proposePairs(n);
-        if (blocks.length < n) return false;
-        for (const b of blocks) pushBlocks.set(b, { mesh: null });
-        for (const p of pads) pushPads.set(p, null);
-        return { blocks, pads };
-      },
-      () => { pushBlocks.clear(); pushPads.clear(); },
-      n === count ? 10 : 5,
-    );
+  // Each candidate is staged as bare keys and the WHOLE board is re-solved
+  // before it is kept, so every block that survives is known to be pushable to
+  // its pad alongside all the others - the interference case the old per-block
+  // filter missed. Growing beats proposing N at once and backing off: a pair
+  // that does not work costs one re-roll instead of the whole set.
+  //
+  // Meshes are built only at the end, so a rejected candidate costs nothing.
+  const walkKeys = [...bfsFrom(2, 2, 2).keys()];
+  const blocks = [], pads = [];
+  const usedBlock = new Set(), usedPad = new Set();
+
+  for (let n = 0; n < count; n++){
+    let added = false;
+    for (let attempt = 0; attempt < 12 && !added; attempt++){
+      const pair = proposeOne(walkKeys, usedBlock, usedPad);
+      if (!pair) continue;
+      pushBlocks.set(pair.block, { mesh: null });
+      pushPads.set(pair.pad, null);
+      if (verifyLevel().result === SOLVED){
+        blocks.push(pair.block); pads.push(pair.pad);
+        usedBlock.add(pair.block); usedPad.add(pair.pad);
+        added = true;
+      } else {
+        pushBlocks.delete(pair.block);
+        pushPads.delete(pair.pad);
+      }
+    }
+    if (!added) break;             // board is saturated; keep what is proven
   }
 
   pushBlocks.clear(); pushPads.clear();
-  if (accepted){
-    for (let i = 0; i < accepted.blocks.length; i++){
-      addPushPad(accepted.pads[i]);
-      addPushBlock(accepted.blocks[i]);
-    }
+  for (let i = 0; i < blocks.length; i++){
+    addPushPad(pads[i]);
+    addPushBlock(blocks[i]);
   }
   refreshPads();
   updateGemHUD();

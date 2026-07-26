@@ -59,3 +59,59 @@ the `gen()` / `onGem()` hooks once both halves exist.
 in `src/config/features.js`; the panel builds itself from that registry, so
 adding an entry there makes it appear automatically. Toggling anything rebuilds
 the level immediately.
+
+## Adding a gameplay mechanic
+
+Mechanics are meant to be combined freely, which means any combination has to
+generate levels that can actually be finished. That guarantee comes from one
+place: **the game and the solver share a single set of rules**, in
+`src/core/sim.js`. Nothing about a specific mechanic lives in the solver.
+
+A mechanic is two files:
+
+**1. The rule** — `src/mechanics/rules/<name>.js`. Implement only the hooks you
+need; all are optional:
+
+| hook | meaning |
+|---|---|
+| `exitAllowed(from, exit, S)` | veto leaving a cell in a direction. `exit.mover` is `'player'` or the id of whatever is being shoved |
+| `blocks(cellKey, S)` | the cell cannot be stood on right now |
+| `interact(from, exit, S, rules)` | the destination is blocked but you can clear it (a push) → new state |
+| `extraMoves(S, rules)` | successors that aren't a compass step (a portal) |
+| `onEnter(cellKey, S)` | slice update on arriving (picking something up) |
+| `goal(S)` | your win condition — **AND**-ed with every other mechanic's |
+| `key(S)` | canonical slice identity for the visited set |
+| `initState()` | your slice of the search state; omit if stateless |
+| `enabled()` | whether you're active this level |
+
+Register it in `src/mechanics/rules/index.js`. That's the whole integration —
+the solver, the solvability check and the SOLUTION trail all pick it up.
+
+**2. Generation and meshes** — `src/mechanics/<name>.js`. Place things, then
+prove them: stage a candidate and call `verifyLevel()` from `src/gen/verify.js`,
+keeping it only on `SOLVED`. `src/mechanics/keysgates.js` is the worked example
+— it grows one proven pair at a time, so a gate can never seal off the key that
+opens it.
+
+Two rules of thumb:
+
+- **Never treat `UNKNOWN` as success.** The solver returns `SOLVED`,
+  `UNSOLVABLE` or `UNKNOWN` (budget exhausted). Only the first means anything.
+  Shipping on a timeout is exactly how the old movable-block code produced
+  impossible levels.
+- **Only set `movementInert: true` if collecting your thing genuinely cannot
+  change where the player may walk.** It lets the solver skip your state
+  entirely; it is unsound for anything that opens, moves, or blocks.
+
+## Verifying
+
+```bash
+node tools/verify.mjs            # sweep mechanic combinations x levels x seeds
+node tools/verify.mjs --quick
+node tools/probe.mjs 1 9 puzzle +keysgates    # one level: seed, level, mode, toggles
+node tools/diagnose.mjs 1 9                   # why is this board unsolvable?
+```
+
+These run the real game headless under Node — no browser, no WebGL — via
+`tools/headless.mjs`. `verify.mjs` exits non-zero if any generated level is
+unsolvable or unproven, so it works as a pre-commit check.

@@ -20,7 +20,7 @@ export const labEl = document.getElementById('lab');
 export const featList = document.getElementById('featList');
 // lab organised into collapsible categories so 24 toggles stay navigable
 export const LAB_CATEGORIES = [
-  { name:'OBJECTIVE',  keys:['keystone', 'oneways', 'timer', 'bonusTime', 'sprint'] },
+  { name:'OBJECTIVE',  keys:['keystone', 'keysgates', 'oneways', 'timer', 'bonusTime', 'sprint'] },
   { name:'OBSTACLES',  keys:['towers', 'rails', 'holes', 'bridges', 'portals', 'monuments'] },
   { name:'STONEWORK',  keys:['masonry', 'blockGap', 'bevels', 'tint', 'palette'] },
   { name:'WORLD',      keys:['facePalette', 'shadows'] },

@@ -5,5 +5,7 @@ import { G } from '../../core/globals.js';
 export default {
   id: 'goalcell',
   enabled(){ return !!G.finishKey; },
+  movementInert: true,
+  targets(){ return [G.finishKey]; },
   goal(S){ return S.at === G.finishKey; },
 };
