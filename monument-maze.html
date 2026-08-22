@@ -254,7 +254,7 @@
 // Bump this on every change so you can confirm at a glance you're running the
 // latest build (shown bottom-right in-game and under the menu title). Format:
 // YYYY.MM.DD.n  — n resets to 1 each day, increments for same-day builds.
-const BUILD = '2026.08.22.5';
+const BUILD = '2026.08.22.6';
 (function stampBuild(){
   const tag = document.getElementById('buildTag');
   if (tag) tag.textContent = 'BUILD ' + BUILD;
@@ -460,7 +460,7 @@ const SWIVEL_MS = 480;
 // touch longer and gentler than the tumble without whipping. Larger CAM_TURN_MS
 // = slower plane-to-plane swing; smaller CAM_FOLLOW = slower drift as you walk
 // deeper into a plane.
-const CAM_TURN_MS = 620;   // duration of the camera's skew/elevation arc on a crossing
+const CAM_TURN_MS = 950;   // duration of the camera's skew/elevation arc on a crossing
 const CAM_FOLLOW  = 3.2;   // exponential rate for within-plane follow (was 6)
 
 const FACES = [
