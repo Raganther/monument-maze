@@ -26,6 +26,11 @@
   #timeChip.low { color:#b23a3a; border-color:rgba(178,58,58,0.4); }
   #menuBtn, #labBtn { pointer-events:auto; cursor:pointer; }
   #menuBtn:hover, #labBtn:hover { background:rgba(255,252,246,0.95); }
+  #buildTag {
+    position:fixed; bottom:8px; right:10px; z-index:5; pointer-events:none;
+    color:rgba(92,74,94,0.5); font-size:11px; letter-spacing:2px;
+    font-family:Georgia,'Times New Roman',serif;
+  }
 
   #lab {
     position:fixed; top:70px; right:16px; display:none; flex-direction:column;
@@ -217,6 +222,7 @@
   </div>
 </div>
 <div id="overlay"><span id="overlayText"></span></div>
+<div id="buildTag"></div>
 <div id="lab">
   <div class="labTitle">LABORATORY</div>
   <div class="labLevel">
@@ -241,6 +247,18 @@
 <script>
 (function(){
 'use strict';
+
+// ---------- build stamp ----------
+// Bump this on every change so you can confirm at a glance you're running the
+// latest build (shown bottom-right in-game and under the menu title). Format:
+// YYYY.MM.DD.n  — n resets to 1 each day, increments for same-day builds.
+const BUILD = '2026.08.22.1';
+(function stampBuild(){
+  const tag = document.getElementById('buildTag');
+  if (tag) tag.textContent = 'BUILD ' + BUILD;
+  const sub = document.querySelector('#menu .sub');
+  if (sub) sub.textContent += '  ·  build ' + BUILD;
+})();
 
 // ---------- mode registry ----------
 // A mode is data, not a copy of the code. New experiments = new entries here
