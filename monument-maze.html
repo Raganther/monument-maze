@@ -254,7 +254,7 @@
 // Bump this on every change so you can confirm at a glance you're running the
 // latest build (shown bottom-right in-game and under the menu title). Format:
 // YYYY.MM.DD.n  — n resets to 1 each day, increments for same-day builds.
-const BUILD = '2026.08.22.2';
+const BUILD = '2026.08.22.3';
 (function stampBuild(){
   const tag = document.getElementById('buildTag');
   if (tag) tag.textContent = 'BUILD ' + BUILD;
@@ -3768,7 +3768,15 @@ function executeStep(D, resolveQ, sx, sy){
     // and azimuth afterward — two perpendicular moves that read as an L-shaped
     // detour back through the neutral view. For a swivel the cube ends at
     // tw.toQ, so judge the sign against that final orientation.
-    updateSkewSign(state === 'swivel' ? tw.toQ : world.quaternion);
+    const landQ = state === 'swivel' ? tw.toQ : world.quaternion;
+    updateSkewSign(landQ);
+    // Lock the camera's skew/elevation target to the LANDING cell for the whole
+    // crossing, so the view eases in one smooth arc from where it is to where
+    // it's going. Without this the per-frame target tracks P as it slides across
+    // the edge — where the elevation help reads ~0 — snapping the camera back to
+    // the default mid-flip before it swings out to the new plane (the whip).
+    tw.camSkew = skewTarget();
+    tw.camElev = elevTarget(tw.toP, landQ);
   }
 }
 
@@ -3808,7 +3816,12 @@ function skewTarget(){
 
 // Elevation help for the two blind zones of a fixed camera. Both scale with
 // how deep into the zone the player is, so it eases in.
-function elevTarget(){
+// posOverride / qOverride let callers evaluate the target at a point OTHER than
+// the live player position — e.g. the landing cell of a crossing, so the view
+// eases straight to where the player will be rather than chasing the edge value
+// as P interpolates across it (which momentarily reads depth 0 = ISO_EL and
+// yanks the camera back to the default before it settles).
+function elevTarget(posOverride, qOverride){
   if (!featureOn('skewView') || featureOn('freeCam')) return ISO_EL;
   const S = FEATURES.skewView.sliders;
   const lift = S[0].value * Math.PI/180, dip = S[1].value * Math.PI/180;
@@ -3816,8 +3829,9 @@ function elevTarget(){
   // the sides vanish
   const clamp = e => Math.min(1.30, Math.max(0.22, e));   // ~12.5° .. ~74.5°
   // where is the player, in world space, on the cube?
-  const wp = P.clone().applyQuaternion(world.quaternion);
-  const wn = Nf.clone().applyQuaternion(world.quaternion);
+  const q = qOverride || world.quaternion;
+  const wp = (posOverride || P).clone().applyQuaternion(q);
+  const wn = Nf.clone().applyQuaternion(q);
   if (Math.abs(wn.y) < 0.5){
     // side plane: the further down, the lower the view drops
     const depth = Math.min(1, Math.max(0, (H*0.35 - wp.y) / (H * 1.35)));
@@ -3834,7 +3848,12 @@ function elevTarget(){
 }
 // ease the camera skew and elevation toward their targets
 function updateSkew(dt){
-  const ts = skewTarget(), te = elevTarget();
+  // Mid-crossing, ease toward the locked landing targets (captured when the
+  // crossing began) rather than the live position-based ones — the live values
+  // dip to the default as P slides across the edge and would whip the camera.
+  const crossing = (state === 'flip' || state === 'swivel') && tw && tw.camElev !== undefined;
+  const ts = crossing ? tw.camSkew : skewTarget();
+  const te = crossing ? tw.camElev : elevTarget();
   const ds = Math.abs(skewCur - ts), de = Math.abs(elevCur - te);
   if (ds < 0.0005 && de < 0.0005){
     if (skewCur !== ts || elevCur !== te){
