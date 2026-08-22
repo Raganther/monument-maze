@@ -254,7 +254,7 @@
 // Bump this on every change so you can confirm at a glance you're running the
 // latest build (shown bottom-right in-game and under the menu title). Format:
 // YYYY.MM.DD.n  — n resets to 1 each day, increments for same-day builds.
-const BUILD = '2026.08.22.4';
+const BUILD = '2026.08.22.5';
 (function stampBuild(){
   const tag = document.getElementById('buildTag');
   if (tag) tag.textContent = 'BUILD ' + BUILD;
@@ -456,6 +456,12 @@ const CELL = (2*H) / N;
 const SLIDE_MS = 150;
 const FLIP_MS  = 340;
 const SWIVEL_MS = 480;
+// Camera feel (SKEWED VIEW). Independent of the flip so the view can glide a
+// touch longer and gentler than the tumble without whipping. Larger CAM_TURN_MS
+// = slower plane-to-plane swing; smaller CAM_FOLLOW = slower drift as you walk
+// deeper into a plane.
+const CAM_TURN_MS = 620;   // duration of the camera's skew/elevation arc on a crossing
+const CAM_FOLLOW  = 3.2;   // exponential rate for within-plane follow (was 6)
 
 const FACES = [
   { n:new THREE.Vector3( 1,0,0), name:'EAST',   color:'#e08e79' },
@@ -491,6 +497,9 @@ let camAz = Math.PI/4, camEl = Math.atan(1/Math.SQRT2);   // matches the locked 
 // squashed one. It flips only when the player changes plane — never mid-walk,
 // which would swing the view and change what the keys mean underfoot.
 let skewSign = 1, skewCur = 0, elevCur = Math.atan(1/Math.SQRT2);
+// an in-flight camera arc for a plane crossing: { t, dur, s0,e0 -> s1,e1 }.
+// Runs on its own clock so it can outlast the flip for a gentler settle.
+let camMove = null;
 const CAM_R = Math.sqrt(12*12*3);   // the classic (12,12,12) isometric distance
 function applyCamera(){
   if (featureOn('freeCam')){
@@ -3279,6 +3288,7 @@ function buildLevel(){
   Nf.copy(FACES[2].n);
   player.quaternion.copy(playerTargetQuat());
   state = 'idle'; tw = null; peeked = false; portalArmed = null; autoPush = null;
+  camMove = null;
   skewSign = 1; skewCur = skewTarget(); elevCur = elevTarget(); applyCamera();
 
   levelChip.textContent = mode.name + ' \u00b7 ' + level;
@@ -3492,6 +3502,7 @@ function buildFeatureRow(key, container){
     else if (key === 'drone'){ if (f.on){ audio(); startDrone(); } else stopDrone(); }
     else if (key === 'seeThrough'){ if (!f.on) clearSeeThrough(); }
     else if (key === 'freeCam' || key === 'skewView'){
+      camMove = null;
       if (key === 'skewView') skewCur = skewTarget();
       applyCamera();
     }
@@ -3522,7 +3533,7 @@ function buildFeatureRow(key, container){
         const v = parseFloat(inp.value);
         if (def.key === 'main') f.slider.value = v; else def.value = v;
         val.textContent = labelFor(def.key, v);
-        if (key === 'skewView'){ skewCur = skewTarget(); elevCur = elevTarget(); }
+        if (key === 'skewView'){ camMove = null; skewCur = skewTarget(); elevCur = elevTarget(); }
         if (key === 'sound' && masterGain) masterGain.gain.value = v/100 * 0.5;
         if (key === 'drone' && droneGain) droneGain.gain.value = v/100 * 0.35;
         if (key === 'shadows') applyShadows();
@@ -3770,15 +3781,15 @@ function executeStep(D, resolveQ, sx, sy){
     // tw.toQ, so judge the sign against that final orientation.
     const landQ = state === 'swivel' ? tw.toQ : world.quaternion;
     updateSkewSign(landQ);
-    // Lock the camera's skew/elevation target to the LANDING cell for the whole
-    // crossing, so the view eases in one smooth arc from where it is to where
-    // it's going. Without this the per-frame target tracks P as it slides across
-    // the edge — where the elevation help reads ~0 — snapping the camera back to
-    // the default mid-flip before it swings out to the new plane (the whip).
-    tw.camSkew = skewTarget();
-    tw.camElev = elevTarget(tw.toP, landQ);
-    tw.camSkew0 = skewCur;      // where the camera is now — the arc starts here
-    tw.camElev0 = elevCur;
+    // Start a dedicated camera arc to the LANDING cell's view, on its own clock
+    // (CAM_TURN_MS) rather than the flip's. Two reasons: the target is locked to
+    // where the player lands, so the view doesn't chase P across the edge (where
+    // the elevation help reads ~0) and snap back to default mid-flip; and a
+    // longer, gently eased arc lets the camera settle after the tumble instead
+    // of matching its speed — a calmer follow, still whip-free (slow start).
+    camMove = { t:0, dur: CAM_TURN_MS * speed(),
+                s0: skewCur, e0: elevCur,
+                s1: skewTarget(), e1: elevTarget(tw.toP, landQ) };
   }
 }
 
@@ -3850,17 +3861,16 @@ function elevTarget(posOverride, qOverride){
 }
 // ease the camera skew and elevation toward their targets
 function updateSkew(dt){
-  // During a crossing, move the camera in lockstep with the flip itself: lerp
-  // from the angles captured at crossing-start to the locked landing targets,
-  // driven by the flip's OWN eased progress (easeFlip). This keeps the camera
-  // and the tumble perfectly synchronised — one smooth slow-fast-slow arc. The
-  // old exponential smoother moved fastest on the first frame (a whip) and ran
-  // on its own clock, out of step with the player.
-  if ((state === 'flip' || state === 'swivel') && tw && tw.camElev !== undefined){
-    const k = easeFlip(Math.min(1, tw.t / tw.dur));
-    skewCur = tw.camSkew0 + (tw.camSkew - tw.camSkew0) * k;
-    elevCur = tw.camElev0 + (tw.camElev - tw.camElev0) * k;
+  // A crossing arc in flight: drive the camera along its own eased curve from
+  // the start angles to the locked landing targets. Slow start (easeFlip) means
+  // no whip; its own clock (CAM_TURN_MS) lets it glide gently past the flip.
+  if (camMove){
+    camMove.t += dt;
+    const k = easeFlip(Math.min(1, camMove.t / camMove.dur));
+    skewCur = camMove.s0 + (camMove.s1 - camMove.s0) * k;
+    elevCur = camMove.e0 + (camMove.e1 - camMove.e0) * k;
     applyCamera();
+    if (camMove.t >= camMove.dur) camMove = null;   // hand back to live follow
     return;
   }
   // Idle / within-plane motion: chase the live position-based target with a
@@ -3873,7 +3883,7 @@ function updateSkew(dt){
     }
     return;
   }
-  const k = 1 - Math.exp(-6 * dt / 1000);
+  const k = 1 - Math.exp(-CAM_FOLLOW * dt / 1000);
   skewCur += (ts - skewCur) * k;
   elevCur += (te - elevCur) * k;
   applyCamera();
