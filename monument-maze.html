@@ -254,7 +254,7 @@
 // Bump this on every change so you can confirm at a glance you're running the
 // latest build (shown bottom-right in-game and under the menu title). Format:
 // YYYY.MM.DD.n  — n resets to 1 each day, increments for same-day builds.
-const BUILD = '2026.08.22.3';
+const BUILD = '2026.08.22.4';
 (function stampBuild(){
   const tag = document.getElementById('buildTag');
   if (tag) tag.textContent = 'BUILD ' + BUILD;
@@ -3777,6 +3777,8 @@ function executeStep(D, resolveQ, sx, sy){
     // the default mid-flip before it swings out to the new plane (the whip).
     tw.camSkew = skewTarget();
     tw.camElev = elevTarget(tw.toP, landQ);
+    tw.camSkew0 = skewCur;      // where the camera is now — the arc starts here
+    tw.camElev0 = elevCur;
   }
 }
 
@@ -3848,12 +3850,22 @@ function elevTarget(posOverride, qOverride){
 }
 // ease the camera skew and elevation toward their targets
 function updateSkew(dt){
-  // Mid-crossing, ease toward the locked landing targets (captured when the
-  // crossing began) rather than the live position-based ones — the live values
-  // dip to the default as P slides across the edge and would whip the camera.
-  const crossing = (state === 'flip' || state === 'swivel') && tw && tw.camElev !== undefined;
-  const ts = crossing ? tw.camSkew : skewTarget();
-  const te = crossing ? tw.camElev : elevTarget();
+  // During a crossing, move the camera in lockstep with the flip itself: lerp
+  // from the angles captured at crossing-start to the locked landing targets,
+  // driven by the flip's OWN eased progress (easeFlip). This keeps the camera
+  // and the tumble perfectly synchronised — one smooth slow-fast-slow arc. The
+  // old exponential smoother moved fastest on the first frame (a whip) and ran
+  // on its own clock, out of step with the player.
+  if ((state === 'flip' || state === 'swivel') && tw && tw.camElev !== undefined){
+    const k = easeFlip(Math.min(1, tw.t / tw.dur));
+    skewCur = tw.camSkew0 + (tw.camSkew - tw.camSkew0) * k;
+    elevCur = tw.camElev0 + (tw.camElev - tw.camElev0) * k;
+    applyCamera();
+    return;
+  }
+  // Idle / within-plane motion: chase the live position-based target with a
+  // gentle exponential smoother.
+  const ts = skewTarget(), te = elevTarget();
   const ds = Math.abs(skewCur - ts), de = Math.abs(elevCur - te);
   if (ds < 0.0005 && de < 0.0005){
     if (skewCur !== ts || elevCur !== te){
