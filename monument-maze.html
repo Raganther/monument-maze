@@ -254,7 +254,7 @@
 // Bump this on every change so you can confirm at a glance you're running the
 // latest build (shown bottom-right in-game and under the menu title). Format:
 // YYYY.MM.DD.n  — n resets to 1 each day, increments for same-day builds.
-const BUILD = '2026.08.22.7';
+const BUILD = '2026.08.22.8';
 (function stampBuild(){
   const tag = document.getElementById('buildTag');
   if (tag) tag.textContent = 'BUILD ' + BUILD;
@@ -448,6 +448,51 @@ const FEATURES = {
 const featureOn = k => FEATURES[k].on;
 const speed = () => featureOn('sprint') ? 0.55 : 1;
 const timerActive = () => MODE().timer && featureOn('timer');
+
+// ---------- lab persistence ----------
+// Remember the lab's toggles and slider values in localStorage so a browser
+// reload comes back to the same setup. Stored per-origin; wrapped in try/catch
+// because storage can be unavailable (private mode, blocked) or throw — in
+// which case we silently fall back to the built-in defaults.
+const LAB_STORE_KEY = 'monumentMaze.lab.v1';
+function saveLabSettings(){
+  try {
+    const data = {};
+    for (const key in FEATURES){
+      const f = FEATURES[key];
+      const entry = { on: !!f.on };
+      if (f.slider) entry.main = f.slider.value;
+      if (f.sliders){
+        entry.sub = {};
+        for (const s of f.sliders) entry.sub[s.key] = s.value;
+      }
+      data[key] = entry;
+    }
+    localStorage.setItem(LAB_STORE_KEY, JSON.stringify(data));
+  } catch (e) { /* storage full/unavailable — settings just won't persist */ }
+}
+function loadLabSettings(){
+  try {
+    const raw = localStorage.getItem(LAB_STORE_KEY);
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== 'object') return;
+    for (const key in FEATURES){
+      const saved = data[key];
+      if (!saved || typeof saved !== 'object') continue;
+      const f = FEATURES[key];
+      if (typeof saved.on === 'boolean') f.on = saved.on;
+      if (f.slider && typeof saved.main === 'number') f.slider.value = saved.main;
+      if (f.sliders && saved.sub){
+        for (const s of f.sliders){
+          if (typeof saved.sub[s.key] === 'number') s.value = saved.sub[s.key];
+        }
+      }
+    }
+  } catch (e) { /* corrupt or unreadable — keep the defaults */ }
+}
+// apply saved settings before anything reads FEATURES (camera setup, lab UI)
+loadLabSettings();
 
 // ---------- layout ----------
 const N = 6;
@@ -3490,6 +3535,7 @@ function buildFeatureRow(key, container){
     f.on = !f.on;
     sync();
     if (sl) sl.style.display = f.on ? 'block' : 'none';
+    saveLabSettings();               // persist the toggle (even from the menu)
     if (phase === 'menu') return;
     // display-only switches must not regenerate the level under test
     if (key === 'solution') drawTrail();
@@ -3563,6 +3609,7 @@ function buildFeatureRow(key, container){
           gapTimer = setTimeout(() => { applyBevels(); buildLevel(); }, 140);
         }
         applyCamera();
+        saveLabSettings();           // persist the new slider value
       });
       if (def.label){
         const lbl = document.createElement('div');
